@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   Eye,
   Heart,
@@ -66,10 +66,12 @@ export default function MapPage({
   const [status, setStatus] = useState<PostMapStatus>("all");
   const [search, setSearch] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [mapLayoutSize, setMapLayoutSize] = useState<number | null>(null);
   const [mapReady, setMapReady] = useState(false);
   const [mapError, setMapError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const mapPanelRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -115,6 +117,22 @@ export default function MapPage({
   useEffect(() => {
     void load();
   }, [load]);
+
+  useLayoutEffect(() => {
+    const panel = mapPanelRef.current;
+    if (!panel) return;
+
+    const updateSize = (width: number) => {
+      const nextSize = Math.max(280, Math.round(width - 36));
+      setMapLayoutSize((current) => current === nextSize ? current : nextSize);
+    };
+
+    updateSize(panel.clientWidth);
+    const observer = new ResizeObserver(([entry]) => updateSize(entry.contentRect.width));
+    observer.observe(panel);
+
+    return () => observer.disconnect();
+  }, [data]);
 
   const filteredItems = useMemo(() => {
     const query = search.trim().toLocaleLowerCase("es");
@@ -239,12 +257,10 @@ export default function MapPage({
         map: MAP_NAME,
         aspectScale: 1,
         roam: true,
-        zoom: 1.08,
+        zoom: 1,
         scaleLimit: { min: 1, max: 18 },
-        left: 18,
-        right: 18,
-        top: 48,
-        bottom: 18,
+        layoutCenter: ["50%", "54%"],
+        layoutSize: mapLayoutSize ?? "100%",
         itemStyle: {
           areaColor: palette.land,
           borderColor: palette.border,
@@ -258,7 +274,7 @@ export default function MapPage({
       },
       series,
     };
-  }, [filteredItems, theme]);
+  }, [filteredItems, mapLayoutSize, theme]);
 
   const handleMapClick = (params: unknown) => {
     const postId = (params as { data?: { postId?: unknown } }).data?.postId;
@@ -346,7 +362,7 @@ export default function MapPage({
 
       {data ? (
         <section className={loading ? "map-workspace is-updating" : "map-workspace"}>
-          <div className="map-panel">
+          <div ref={mapPanelRef} className="map-panel">
             <header className="map-panel-header">
               <div>
                 <span className="panel-kicker">Cobertura mundial</span>
