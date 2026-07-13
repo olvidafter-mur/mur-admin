@@ -99,25 +99,54 @@ const normalizeDivisionCollection = (input: GeoFeatureCollection) => ({
   }),
 });
 
+const resolveGeometryUrl = (geometryUrl: string) => {
+  let parsedUrl: URL;
+  try {
+    parsedUrl = new URL(geometryUrl);
+  } catch {
+    throw new Error("La fuente cartografica devolvio una URL invalida.");
+  }
+
+  if (parsedUrl.protocol !== "https:") {
+    throw new Error("La fuente cartografica devolvio una URL no segura.");
+  }
+
+  const githubRawPath = parsedUrl.hostname === "github.com"
+    ? parsedUrl.pathname.match(/^\/([^/]+)\/([^/]+)\/raw\/([^/]+)\/(.+)$/)
+    : null;
+
+  if (!githubRawPath) return parsedUrl.toString();
+
+  const [, owner, repository, reference, path] = githubRawPath;
+  return `https://media.githubusercontent.com/media/${owner}/${repository}/${reference}/${path}`;
+};
+
 export const getCountryDivisions = async (iso3: string) => {
   const cached = boundaryCache.get(iso3);
   if (cached) return cached;
 
-  const metadataResponse = await fetch(
-    `https://www.geoboundaries.org/api/current/gbOpen/${encodeURIComponent(iso3)}/ADM1/`,
-  );
+  let metadataResponse: Response;
+  try {
+    metadataResponse = await fetch(
+      `https://www.geoboundaries.org/api/current/gbOpen/${encodeURIComponent(iso3)}/ADM1/`,
+    );
+  } catch {
+    throw new Error("No se pudo conectar con el servicio cartografico.");
+  }
   if (!metadataResponse.ok) {
     throw new Error("Este pais no tiene divisiones administrativas disponibles.");
   }
 
   const metadata = await metadataResponse.json() as BoundaryMetadata;
   const geometryUrl = metadata.simplifiedGeometryGeoJSON || metadata.gjDownloadURL;
-  const parsedUrl = new URL(geometryUrl);
-  if (parsedUrl.protocol !== "https:") {
-    throw new Error("La fuente cartografica devolvio una URL no segura.");
-  }
+  const resolvedGeometryUrl = resolveGeometryUrl(geometryUrl);
 
-  const geometryResponse = await fetch(parsedUrl.toString());
+  let geometryResponse: Response;
+  try {
+    geometryResponse = await fetch(resolvedGeometryUrl);
+  } catch {
+    throw new Error("No se pudo conectar con el servicio cartografico.");
+  }
   if (!geometryResponse.ok) {
     throw new Error("No se pudieron cargar las provincias de este pais.");
   }
