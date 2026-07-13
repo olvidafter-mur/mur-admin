@@ -64,11 +64,13 @@ export default function DataChart({
   label,
   className = "",
   onClick,
+  useDirtyRect = true,
 }: {
   option: ChartOption;
   label: string;
   className?: string;
   onClick?: (params: unknown) => void;
+  useDirtyRect?: boolean;
 }) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const chartRef = useRef<ReturnType<typeof echarts.init> | null>(null);
@@ -85,7 +87,7 @@ export default function DataChart({
     const chart = echarts.init(containerRef.current, undefined, {
       renderer: "canvas",
       devicePixelRatio: Math.min(window.devicePixelRatio || 1, 2),
-      useDirtyRect: true,
+      useDirtyRect,
     });
     chartRef.current = chart;
     chart.on("click", (params) => onClickRef.current?.(params));
@@ -98,7 +100,7 @@ export default function DataChart({
       chart.dispose();
       chartRef.current = null;
     };
-  }, []);
+  }, [useDirtyRect]);
 
   useEffect(() => {
     chartRef.current?.setOption(
@@ -112,7 +114,7 @@ export default function DataChart({
       },
       { notMerge: true, lazyUpdate: true },
     );
-  }, [option, reducedMotion]);
+  }, [option, reducedMotion, useDirtyRect]);
 
   return (
     <div

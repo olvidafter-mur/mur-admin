@@ -1,8 +1,11 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
+  ChevronRight,
   Eye,
+  Globe2,
   Heart,
   Layers3,
+  LoaderCircle,
   LockKeyhole,
   MapPin,
   MessageCircle,
@@ -18,13 +21,23 @@ import DataChart, {
 import {
   Avatar,
   Badge,
-  EmptyState,
   ErrorState,
   LoadingState,
   PageHeader,
 } from "../components/ui";
 import { getGlobalPostMap } from "../lib/adminApi";
 import { displayName, formatDate, formatNumber, truncate } from "../lib/format";
+import {
+  featureName,
+  fittedLayoutSize,
+  getCountryDivisions,
+  normalizeWorldCollection,
+  pointInFeature,
+  type CountryDivisions,
+  type CountryReference,
+  type GeoFeature,
+  type GeoFeatureCollection,
+} from "../lib/geo";
 import type {
   AdminView,
   GlobalMapPost,
@@ -51,6 +64,12 @@ type MapDatum = {
   status: GlobalMapPost["status"];
 };
 
+type CountryLayer = {
+  country: CountryReference;
+  divisions: CountryDivisions;
+  mapName: string;
+};
+
 const coordinates = (post: GlobalMapPost) =>
   `${post.latitude.toFixed(5)}, ${post.longitude.toFixed(5)}`;
 
@@ -66,12 +85,19 @@ export default function MapPage({
   const [status, setStatus] = useState<PostMapStatus>("all");
   const [search, setSearch] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [mapLayoutSize, setMapLayoutSize] = useState<number | null>(null);
+  const [worldCollection, setWorldCollection] = useState<GeoFeatureCollection | null>(null);
+  const [countries, setCountries] = useState<CountryReference[]>([]);
+  const [countryLayer, setCountryLayer] = useState<CountryLayer | null>(null);
+  const [selectedDivision, setSelectedDivision] = useState<GeoFeature | null>(null);
+  const [mapViewport, setMapViewport] = useState({ width: 0, height: 0 });
   const [mapReady, setMapReady] = useState(false);
   const [mapError, setMapError] = useState<string | null>(null);
+  const [drillLoading, setDrillLoading] = useState(false);
+  const [drillError, setDrillError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const mapPanelRef = useRef<HTMLDivElement | null>(null);
+  const drillRequestRef = useRef(0);
 
   useEffect(() => {
     let active = true;
@@ -79,11 +105,19 @@ export default function MapPage({
     void fetch(`${import.meta.env.BASE_URL}world.json`)
       .then((response) => {
         if (!response.ok) throw new Error("No se pudo cargar la cartografia.");
-        return response.json() as Promise<Parameters<typeof registerMap>[1]>;
+        return response.json() as Promise<GeoFeatureCollection>;
       })
       .then((world) => {
-        registerMap(MAP_NAME, world);
-        if (active) setMapReady(true);
+        const normalized = normalizeWorldCollection(world);
+        registerMap(
+          MAP_NAME,
+          normalized.collection as Parameters<typeof registerMap>[1],
+        );
+        if (active) {
+          setWorldCollection(normalized.collection);
+          setCountries(normalized.countries);
+          setMapReady(true);
+        }
       })
       .catch((loadError: unknown) => {
         if (active) {
@@ -120,23 +154,76 @@ export default function MapPage({
 
   useLayoutEffect(() => {
     const panel = mapPanelRef.current;
-    if (!panel) return;
+    const chart = panel?.querySelector<HTMLElement>(".data-chart-world");
+    if (!chart) return;
 
-    const updateSize = (width: number) => {
-      const nextSize = Math.max(280, Math.round(width - 36));
-      setMapLayoutSize((current) => current === nextSize ? current : nextSize);
+    const updateSize = (width: number, height: number) => {
+      const next = { width: Math.round(width), height: Math.round(height) };
+      setMapViewport((current) => (
+        current.width === next.width && current.height === next.height ? current : next
+      ));
     };
 
-    updateSize(panel.clientWidth);
-    const observer = new ResizeObserver(([entry]) => updateSize(entry.contentRect.width));
-    observer.observe(panel);
+    updateSize(chart.clientWidth, chart.clientHeight);
+    const observer = new ResizeObserver(([entry]) => {
+      updateSize(entry.contentRect.width, entry.contentRect.height);
+    });
+    observer.observe(chart);
 
     return () => observer.disconnect();
-  }, [data]);
+  }, [data, mapReady]);
+
+  const enterCountry = useCallback(async (country: CountryReference) => {
+    const requestId = ++drillRequestRef.current;
+    setDrillLoading(true);
+    setDrillError(null);
+
+    try {
+      const divisions = await getCountryDivisions(country.iso3);
+      if (requestId !== drillRequestRef.current) return;
+
+      const mapName = `mur-adm1-${country.iso3.toLowerCase()}`;
+      registerMap(
+        mapName,
+        divisions.collection as Parameters<typeof registerMap>[1],
+      );
+      setCountryLayer({ country, divisions, mapName });
+      setSelectedDivision(null);
+    } catch (loadError) {
+      if (requestId === drillRequestRef.current) {
+        setDrillError(
+          loadError instanceof Error
+            ? loadError.message
+            : "No se pudieron cargar las divisiones administrativas.",
+        );
+      }
+    } finally {
+      if (requestId === drillRequestRef.current) setDrillLoading(false);
+    }
+  }, []);
+
+  const showWorld = () => {
+    drillRequestRef.current += 1;
+    setCountryLayer(null);
+    setSelectedDivision(null);
+    setDrillLoading(false);
+    setDrillError(null);
+  };
+
+  const scopedItems = useMemo(() => {
+    const items = data?.items ?? [];
+    const boundary = selectedDivision ?? countryLayer?.country.feature;
+    if (!boundary) return items;
+
+    return items.filter((post) => pointInFeature(
+      [post.longitude, post.latitude],
+      boundary,
+    ));
+  }, [countryLayer, data, selectedDivision]);
 
   const filteredItems = useMemo(() => {
     const query = search.trim().toLocaleLowerCase("es");
-    return (data?.items ?? []).filter((post) => {
+    return scopedItems.filter((post) => {
       if (status !== "all" && post.status !== status) return false;
       if (!query) return true;
 
@@ -147,7 +234,7 @@ export default function MapPage({
         post.category_name,
       ].some((value) => value?.toLocaleLowerCase("es").includes(query));
     });
-  }, [data, search, status]);
+  }, [scopedItems, search, status]);
 
   useEffect(() => {
     setSelectedId((current) => (
@@ -158,6 +245,18 @@ export default function MapPage({
   }, [filteredItems]);
 
   const selectedPost = filteredItems.find((post) => post.id === selectedId) ?? null;
+  const activeCollection = countryLayer?.divisions.collection ?? worldCollection;
+  const mapLayoutSize = useMemo(() => fittedLayoutSize(
+    activeCollection,
+    mapViewport.width,
+    mapViewport.height,
+  ), [activeCollection, mapViewport]);
+  const scopeLabel = selectedDivision
+    ? featureName(selectedDivision)
+    : countryLayer?.country.name ?? "Mundo";
+  const showDivisionLabels = Boolean(
+    countryLayer && countryLayer.divisions.collection.features.length <= 40,
+  );
 
   const mapOption = useMemo<ChartOption>(() => {
     const palette = theme === "dark"
@@ -170,6 +269,8 @@ export default function MapPage({
           visible: "#579dff",
           moderated: "#fd9891",
           deleted: "#8c9bab",
+          selectedLand: "#1c416d",
+          selectedBorder: "#85b8ff",
         }
       : {
           land: "#eef1f4",
@@ -180,6 +281,8 @@ export default function MapPage({
           visible: "#0c66e4",
           moderated: "#ae2e24",
           deleted: "#7e8da7",
+          selectedLand: "#dbeafe",
+          selectedBorder: "#0c66e4",
         };
 
     const series = (["visible", "moderated", "deleted"] as const).map((itemStatus) => {
@@ -228,7 +331,7 @@ export default function MapPage({
       backgroundColor: "transparent",
       aria: {
         enabled: true,
-        label: { description: `Mapa mundial con ${filteredItems.length} publicaciones geolocalizadas.` },
+        label: { description: `Mapa de ${scopeLabel} con ${filteredItems.length} publicaciones geolocalizadas.` },
       },
       tooltip: {
         trigger: "item",
@@ -239,8 +342,13 @@ export default function MapPage({
         padding: 10,
         textStyle: { color: palette.ink, fontSize: 12 },
         formatter: (params: unknown) => {
-          const datum = (params as { data?: MapDatum }).data;
-          if (!datum) return "";
+          const mapParams = params as { data?: MapDatum; name?: unknown };
+          const datum = mapParams.data;
+          if (!datum || typeof datum.postId !== "string") {
+            return typeof mapParams.name === "string"
+              ? `${mapParams.name}\nClick para explorar`
+              : "";
+          }
           const activity = datum.value[2];
           return `${datum.author}\n${truncate(datum.content, 62)}\n${statusCopy[datum.status].label} · ${activity} interacciones`;
         },
@@ -254,38 +362,75 @@ export default function MapPage({
         textStyle: { color: palette.muted, fontSize: 11 },
       },
       geo: {
-        map: MAP_NAME,
+        map: countryLayer?.mapName ?? MAP_NAME,
         aspectScale: 1,
         roam: true,
         zoom: 1,
         scaleLimit: { min: 1, max: 18 },
         layoutCenter: ["50%", "54%"],
         layoutSize: mapLayoutSize ?? "100%",
+        label: {
+          show: showDivisionLabels,
+          color: palette.muted,
+          fontSize: 9,
+        },
         itemStyle: {
           areaColor: palette.land,
           borderColor: palette.border,
           borderWidth: 0.65,
         },
         emphasis: {
-          label: { show: false },
+          label: {
+            show: Boolean(countryLayer),
+            color: palette.ink,
+            fontSize: 10,
+          },
           itemStyle: { areaColor: palette.landHover },
         },
+        regions: selectedDivision ? [{
+          name: featureName(selectedDivision),
+          itemStyle: {
+            areaColor: palette.selectedLand,
+            borderColor: palette.selectedBorder,
+            borderWidth: 1.5,
+          },
+        }] : [],
         selectedMode: false,
       },
       series,
     };
-  }, [filteredItems, mapLayoutSize, theme]);
+  }, [countryLayer, filteredItems, mapLayoutSize, scopeLabel, selectedDivision, showDivisionLabels, theme]);
 
   const handleMapClick = (params: unknown) => {
-    const postId = (params as { data?: { postId?: unknown } }).data?.postId;
-    if (typeof postId === "string") setSelectedId(postId);
+    const event = params as {
+      componentType?: unknown;
+      data?: { postId?: unknown };
+      name?: unknown;
+    };
+    const postId = event.data?.postId;
+    if (typeof postId === "string") {
+      setSelectedId(postId);
+      return;
+    }
+
+    if (event.componentType !== "geo" || typeof event.name !== "string") return;
+    if (countryLayer) {
+      const division = countryLayer.divisions.collection.features.find(
+        (feature) => featureName(feature) === event.name,
+      );
+      if (division) setSelectedDivision(division);
+      return;
+    }
+
+    const country = countries.find((item) => item.name === event.name);
+    if (country) void enterCountry(country);
   };
 
   const metricItems = [
-    { key: "all", label: "Con ubicacion", value: data?.total ?? 0 },
-    { key: "visible", label: "Visibles", value: data?.visible ?? 0 },
-    { key: "moderated", label: "Moderados", value: data?.moderated ?? 0 },
-    { key: "deleted", label: "Eliminados", value: data?.deleted ?? 0 },
+    { key: "all", label: "Con ubicacion", value: scopedItems.length },
+    { key: "visible", label: "Visibles", value: scopedItems.filter((post) => post.status === "visible").length },
+    { key: "moderated", label: "Moderados", value: scopedItems.filter((post) => post.status === "moderated").length },
+    { key: "deleted", label: "Eliminados", value: scopedItems.filter((post) => post.status === "deleted").length },
   ] as const;
 
   return (
@@ -352,40 +497,89 @@ export default function MapPage({
         </label>
         <div className="map-result-count">
           <Layers3 size={16} />
-          <span>{formatNumber(filteredItems.length)} puntos en vista</span>
+          <span>{formatNumber(filteredItems.length)} puntos en {scopeLabel}</span>
         </div>
       </div>
 
       {error ? <ErrorState message={error} /> : null}
       {mapError ? <ErrorState message={mapError} /> : null}
+      {drillError ? <ErrorState message={drillError} /> : null}
       {loading && !data ? <LoadingState label="Cargando publicaciones geolocalizadas" /> : null}
 
       {data ? (
         <section className={loading ? "map-workspace is-updating" : "map-workspace"}>
           <div ref={mapPanelRef} className="map-panel">
             <header className="map-panel-header">
-              <div>
-                <span className="panel-kicker">Cobertura mundial</span>
-                <h2>Distribucion de publicaciones</h2>
+              <div className="map-panel-title">
+                <nav className="map-breadcrumb" aria-label="Nivel geografico">
+                  <button
+                    className={!countryLayer ? "is-current" : ""}
+                    type="button"
+                    aria-current={!countryLayer ? "location" : undefined}
+                    onClick={showWorld}
+                  >
+                    <Globe2 size={13} /> Mundo
+                  </button>
+                  {countryLayer ? (
+                    <>
+                      <ChevronRight size={13} />
+                      <button
+                        className={!selectedDivision ? "is-current" : ""}
+                        type="button"
+                        aria-current={!selectedDivision ? "location" : undefined}
+                        onClick={() => setSelectedDivision(null)}
+                      >
+                        {countryLayer.country.name}
+                      </button>
+                    </>
+                  ) : null}
+                  {selectedDivision ? (
+                    <>
+                      <ChevronRight size={13} />
+                      <span>{featureName(selectedDivision)}</span>
+                    </>
+                  ) : null}
+                </nav>
+                <h2>
+                  {countryLayer
+                    ? `Division politica de ${countryLayer.country.name}`
+                    : "Distribucion mundial de publicaciones"}
+                </h2>
               </div>
-              <span className="map-interaction-hint"><MousePointer2 size={14} /> Arrastra y usa la rueda para explorar</span>
+              <span className="map-interaction-hint">
+                <MousePointer2 size={14} />
+                {countryLayer ? "Selecciona una provincia para filtrar" : "Selecciona un pais para ver sus provincias"}
+              </span>
             </header>
 
             {mapReady ? (
               <DataChart
                 className="data-chart-world"
                 option={mapOption}
-                label={`Mapa mundial con ${filteredItems.length} publicaciones geolocalizadas`}
+                label={`Mapa de ${scopeLabel} con ${filteredItems.length} publicaciones geolocalizadas`}
                 onClick={handleMapClick}
+                useDirtyRect={false}
               />
             ) : mapError ? null : (
               <LoadingState label="Preparando cartografia" />
             )}
 
-            {mapReady && filteredItems.length === 0 ? (
-              <div className="map-empty-overlay">
-                <EmptyState title="No hay puntos para mostrar" description="Cambia el estado, el periodo o la busqueda." />
+            {drillLoading ? (
+              <div className="map-drill-overlay" role="status">
+                <LoaderCircle className="spin" size={20} />
+                <span>Cargando divisiones administrativas</span>
               </div>
+            ) : null}
+
+            {mapReady && filteredItems.length === 0 ? (
+              <div className="map-no-posts-note">No hay publicaciones para los filtros actuales en {scopeLabel}.</div>
+            ) : null}
+
+            {countryLayer ? (
+              <footer className="map-attribution">
+                Limites: {countryLayer.divisions.metadata.boundarySource} · {countryLayer.divisions.metadata.boundaryLicense} ·{" "}
+                <a href="https://www.geoboundaries.org/" target="_blank" rel="noreferrer">geoBoundaries</a>
+              </footer>
             ) : null}
           </div>
 

@@ -3121,23 +3121,95 @@ th {
   font-weight: 680;
 }
 
+.map-panel-title {
+  min-width: 0;
+}
+
+.map-breadcrumb {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.25rem;
+  color: var(--subtle);
+  font-size: 0.625rem;
+}
+
+.map-breadcrumb button,
+.map-breadcrumb span {
+  overflow: hidden;
+  max-width: 180px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.map-breadcrumb button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  border: 0;
+  border-radius: var(--radius-xs);
+  background: transparent;
+  padding: 0.2rem 0.3rem;
+  color: var(--muted);
+  font-size: inherit;
+}
+
+.map-breadcrumb button:hover,
+.map-breadcrumb button.is-current {
+  background: var(--signal-soft);
+  color: var(--signal);
+}
+
 .data-chart-world {
   height: 650px;
   margin: 0;
 }
 
-.map-empty-overlay {
+.map-drill-overlay {
   position: absolute;
-  z-index: 2;
+  z-index: 4;
   inset: 72px 0 0;
-  display: grid;
-  place-items: center;
-  background: color-mix(in srgb, var(--surface) 82%, transparent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  background: color-mix(in srgb, var(--surface) 72%, transparent);
+  color: var(--ink-soft);
+  font-size: 0.75rem;
+  backdrop-filter: blur(2px);
 }
 
-.map-empty-overlay .state-panel {
-  border: 0;
-  background: transparent;
+.map-no-posts-note,
+.map-attribution {
+  position: absolute;
+  z-index: 3;
+  right: 0.8rem;
+  left: 0.8rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  color: var(--subtle);
+  font-size: 0.625rem;
+  line-height: 1.4;
+  backdrop-filter: blur(8px);
+}
+
+.map-no-posts-note {
+  bottom: 2.6rem;
+  padding: 0.55rem 0.65rem;
+  pointer-events: none;
+  text-align: center;
+}
+
+.map-attribution {
+  bottom: 0.6rem;
+  width: fit-content;
+  max-width: calc(100% - 1.6rem);
+  padding: 0.35rem 0.5rem;
+}
+
+.map-attribution a {
+  color: var(--signal);
 }
 
 .map-inspector {
