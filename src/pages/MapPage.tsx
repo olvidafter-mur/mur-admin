@@ -237,6 +237,7 @@ export default function MapPage({
       },
       geo: {
         map: MAP_NAME,
+        aspectScale: 1,
         roam: true,
         zoom: 1.08,
         scaleLimit: { min: 1, max: 18 },
