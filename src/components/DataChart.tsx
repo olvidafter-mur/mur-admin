@@ -5,12 +5,14 @@ import {
   GraphChart,
   LineChart,
   PieChart,
+  ScatterChart,
 } from "echarts/charts";
 import {
   AriaComponent,
   DataZoomComponent,
   DatasetComponent,
   GridComponent,
+  GeoComponent,
   LegendComponent,
   TooltipComponent,
 } from "echarts/components";
@@ -25,16 +27,23 @@ echarts.use([
   DataZoomComponent,
   DatasetComponent,
   GraphChart,
+  GeoComponent,
   GridComponent,
   LabelLayout,
   LegendComponent,
   LineChart,
   PieChart,
+  ScatterChart,
   TooltipComponent,
   UniversalTransition,
 ]);
 
 export type ChartOption = EChartsCoreOption;
+
+export const registerMap = (
+  name: string,
+  geoJson: Parameters<typeof echarts.registerMap>[1],
+) => echarts.registerMap(name, geoJson);
 
 const useReducedMotion = () => {
   const [reduced, setReduced] = useState(false);
@@ -54,14 +63,21 @@ export default function DataChart({
   option,
   label,
   className = "",
+  onClick,
 }: {
   option: ChartOption;
   label: string;
   className?: string;
+  onClick?: (params: unknown) => void;
 }) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const chartRef = useRef<ReturnType<typeof echarts.init> | null>(null);
   const reducedMotion = useReducedMotion();
+  const onClickRef = useRef(onClick);
+
+  useEffect(() => {
+    onClickRef.current = onClick;
+  }, [onClick]);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -72,6 +88,7 @@ export default function DataChart({
       useDirtyRect: true,
     });
     chartRef.current = chart;
+    chart.on("click", (params) => onClickRef.current?.(params));
 
     const observer = new ResizeObserver(() => chart.resize());
     observer.observe(containerRef.current);

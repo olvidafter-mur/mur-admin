@@ -4,7 +4,10 @@ import type {
   AdminUser,
   AnalyticsRange,
   DashboardData,
+  GlobalPostMapData,
   PaginatedResult,
+  PostMapRange,
+  PostMapStatus,
   PostRow,
   ReportRow,
   UserRow,
@@ -74,6 +77,15 @@ export const listPosts = (params: {
     _status: params.status ?? "all",
     _limit_count: params.limit ?? 25,
     _offset_count: params.offset ?? 0,
+  });
+
+export const getGlobalPostMap = (
+  status: PostMapStatus,
+  days: PostMapRange,
+) =>
+  rpc<GlobalPostMapData>("admin_get_global_post_map", {
+    _status: status,
+    _days: days,
   });
 
 export const setPostModeration = (

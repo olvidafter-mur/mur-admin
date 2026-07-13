@@ -3,6 +3,7 @@ import {
   Activity,
   ChevronRight,
   FileText,
+  Globe2,
   LogOut,
   ShieldAlert,
   ShieldCheck,
@@ -19,6 +20,7 @@ const navItems: Array<{
   icon: typeof Activity;
 }> = [
   { id: "dashboard", label: "Inteligencia", description: "Pulso y patrones", icon: Activity },
+  { id: "map", label: "Mapa global", description: "Actividad geolocalizada", icon: Globe2 },
   { id: "reports", label: "Reportes", description: "Cola de decisiones", icon: ShieldAlert },
   { id: "posts", label: "Publicaciones", description: "Contenido y estado", icon: FileText },
   { id: "users", label: "Usuarios", description: "Perfiles y acceso", icon: UsersRound },

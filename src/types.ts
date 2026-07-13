@@ -1,4 +1,4 @@
-export type AdminView = "dashboard" | "reports" | "posts" | "users";
+export type AdminView = "dashboard" | "map" | "reports" | "posts" | "users";
 export type Theme = "light" | "dark";
 
 export type AdminUser = {
@@ -165,6 +165,39 @@ export type PostRow = {
   status: "visible" | "moderated" | "deleted";
   moderation_reason: string | null;
   moderated_at: string | null;
+};
+
+export type PostMapStatus = "all" | PostRow["status"];
+export type PostMapRange = 0 | 30 | 90;
+
+export type GlobalMapPost = {
+  id: string;
+  content: string;
+  post_type: string | null;
+  created_at: string;
+  deleted_at: string | null;
+  author_id: string;
+  share_location: boolean;
+  latitude: number;
+  longitude: number;
+  username: string | null;
+  display_name: string | null;
+  avatar_url: string | null;
+  category_slug: string | null;
+  category_name: string | null;
+  likes_count: number;
+  comments_count: number;
+  report_count: number;
+  status: PostRow["status"];
+  moderation_reason: string | null;
+};
+
+export type GlobalPostMapData = {
+  items: GlobalMapPost[];
+  total: number;
+  visible: number;
+  moderated: number;
+  deleted: number;
 };
 
 export type ReportRow = {

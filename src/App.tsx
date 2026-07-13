@@ -9,11 +9,12 @@ import LoginPage from "./pages/LoginPage";
 import type { AdminUser, AdminView, Theme } from "./types";
 
 const DashboardPage = lazy(() => import("./pages/DashboardPage"));
+const MapPage = lazy(() => import("./pages/MapPage"));
 const PostsPage = lazy(() => import("./pages/PostsPage"));
 const ReportsPage = lazy(() => import("./pages/ReportsPage"));
 const UsersPage = lazy(() => import("./pages/UsersPage"));
 
-const validViews: AdminView[] = ["dashboard", "reports", "posts", "users"];
+const validViews: AdminView[] = ["dashboard", "map", "reports", "posts", "users"];
 
 const getViewFromHash = (): AdminView => {
   const hash = window.location.hash.replace("#", "") as AdminView;
@@ -207,6 +208,7 @@ export default function App() {
       >
         <Suspense fallback={<ViewLoader />}>
           {view === "dashboard" ? <DashboardPage theme={theme} onNavigate={navigate} /> : null}
+          {view === "map" ? <MapPage theme={theme} onNavigate={navigate} /> : null}
           {view === "reports" ? <ReportsPage notify={notify} /> : null}
           {view === "posts" ? <PostsPage notify={notify} /> : null}
           {view === "users" ? <UsersPage notify={notify} /> : null}
