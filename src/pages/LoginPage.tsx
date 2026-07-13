@@ -1,9 +1,16 @@
 import { useState, type FormEvent } from "react";
 import { Eye, EyeOff, LoaderCircle, LockKeyhole, Mail } from "lucide-react";
 import { requireSupabase } from "../lib/supabase";
-import { ErrorState } from "../components/ui";
+import { BrandMark, ErrorState, ThemeToggle } from "../components/ui";
+import type { Theme } from "../types";
 
-export default function LoginPage() {
+export default function LoginPage({
+  theme,
+  onToggleTheme,
+}: {
+  theme: Theme;
+  onToggleTheme: () => void;
+}) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -28,10 +35,13 @@ export default function LoginPage() {
 
   return (
     <main className="login-layout">
+      <div className="login-theme-toggle">
+        <ThemeToggle theme={theme} onToggle={onToggleTheme} />
+      </div>
       <section className="login-brand-panel" aria-label="Mur administracion">
         <div className="login-brand-content">
           <div className="brand-lockup brand-lockup-login">
-            <span className="brand-mark brand-mark-large">m</span>
+            <BrandMark large />
             <strong>mur.</strong>
           </div>
           <p className="login-eyebrow">Panel privado</p>

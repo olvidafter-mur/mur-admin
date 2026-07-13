@@ -96,7 +96,7 @@ export default function UsersPage({
 
   return (
     <div className="page">
-      <PageHeader title="Usuarios" description="Perfiles, actividad y estado de acceso." />
+      <PageHeader eyebrow="Community" title="Usuarios" description="Perfiles, actividad, reputacion interna y estado de acceso." />
 
       <form className="toolbar" onSubmit={handleSearch}>
         <label className="search-control">
@@ -138,7 +138,7 @@ export default function UsersPage({
             <div className="table-scroll">
               <table>
                 <thead>
-                  <tr><th>Usuario</th><th>Estado</th><th>Actividad</th><th>Ranking</th><th>Reportes</th><th>Alta</th><th><span className="sr-only">Acciones</span></th></tr>
+                  <tr><th>Usuario</th><th>Estado</th><th>Actividad</th><th>Ranking interno</th><th>Reportes</th><th>Alta</th><th><span className="sr-only">Acciones</span></th></tr>
                 </thead>
                 <tbody>
                   {result.items.map((user) => (

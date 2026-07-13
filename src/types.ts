@@ -1,4 +1,5 @@
 export type AdminView = "dashboard" | "reports" | "posts" | "users";
+export type Theme = "light" | "dark";
 
 export type AdminUser = {
   id: string;
@@ -33,6 +34,97 @@ export type RecentReport = {
 export type DashboardData = {
   generated_at: string;
   metrics: DashboardMetrics;
+  recent_reports: RecentReport[];
+};
+
+export type AnalyticsRange = 7 | 30 | 90;
+
+export type AnalyticsOverview = {
+  users_total: number;
+  users_new: number;
+  active_users: number;
+  active_users_previous: number;
+  posts: number;
+  posts_previous: number;
+  interactions: number;
+  interactions_previous: number;
+  reports: number;
+  reports_previous: number;
+  reports_pending: number;
+  reports_reviewed: number;
+  reports_resolved: number;
+  median_review_hours: number | null;
+  admin_actions: number;
+  users_suspended: number;
+  posts_moderated: number;
+};
+
+export type AnalyticsPoint = {
+  date: string;
+  new_users: number;
+  active_users: number;
+  posts: number;
+  likes: number;
+  comments: number;
+  reports: number;
+};
+
+export type CategoryInsight = {
+  slug: string;
+  name: string;
+  color: string | null;
+  posts: number;
+  interactions: number;
+  reports: number;
+  report_rate: number;
+};
+
+export type AudienceSegment = {
+  key: "core" | "creators" | "participants" | "quiet";
+  label: string;
+  users: number;
+  description: string;
+};
+
+export type RiskSignal = {
+  kind: "reports" | "burst" | "blocks";
+  severity: "high" | "medium" | "low";
+  user_id: string;
+  user_name: string;
+  value: number;
+  title: string;
+  detail: string;
+};
+
+export type NetworkNode = {
+  id: string;
+  name: string;
+  score: number;
+  activity: number;
+  reports: number;
+  segment: "signal" | "creator" | "participant";
+};
+
+export type NetworkEdge = {
+  source: string;
+  target: string;
+  weight: number;
+  likes: number;
+  comments: number;
+};
+
+export type AdminAnalyticsData = {
+  generated_at: string;
+  window_days: AnalyticsRange;
+  overview: AnalyticsOverview;
+  timeseries: AnalyticsPoint[];
+  categories: CategoryInsight[];
+  segments: AudienceSegment[];
+  signals: RiskSignal[];
+  network: {
+    nodes: NetworkNode[];
+    edges: NetworkEdge[];
+  };
   recent_reports: RecentReport[];
 };
 

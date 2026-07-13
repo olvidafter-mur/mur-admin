@@ -102,7 +102,7 @@ export default function PostsPage({
 
   return (
     <div className="page">
-      <PageHeader title="Publicaciones" description="Contenido publicado y acciones de moderacion." />
+      <PageHeader eyebrow="Content" title="Publicaciones" description="Contenido publicado, respuesta de la comunidad y acciones de moderacion." />
 
       <form className="toolbar" onSubmit={handleSearch}>
         <label className="search-control">

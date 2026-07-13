@@ -120,7 +120,7 @@ export default function ReportsPage({
 
   return (
     <div className="page">
-      <PageHeader title="Reportes" description="Revision y resolucion de contenido denunciado." />
+      <PageHeader eyebrow="Trust & safety" title="Reportes" description="Revision contextual y resolucion de contenido denunciado." />
 
       <div className="filter-tabs" role="tablist" aria-label="Estado del reporte">
         {(["pending", "resolved", "dismissed"] as const).map((value) => (

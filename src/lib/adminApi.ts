@@ -1,6 +1,8 @@
 import { requireSupabase } from "./supabase";
 import type {
+  AdminAnalyticsData,
   AdminUser,
+  AnalyticsRange,
   DashboardData,
   PaginatedResult,
   PostRow,
@@ -25,6 +27,9 @@ export const getAdminMe = () => rpc<AdminUser>("admin_get_me");
 
 export const getDashboard = () =>
   rpc<DashboardData>("admin_get_dashboard");
+
+export const getAnalytics = (days: AnalyticsRange) =>
+  rpc<AdminAnalyticsData>("admin_get_analytics", { _days: days });
 
 export const listUsers = (params: {
   search?: string;
