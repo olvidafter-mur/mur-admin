@@ -30,6 +30,8 @@ export type BoundaryMetadata = {
   admUnitCount: string;
   simplifiedGeometryGeoJSON: string;
   gjDownloadURL: string;
+  sourceLabel?: string;
+  sourceUrl?: string;
 };
 
 export type CountryDivisions = {
@@ -123,6 +125,25 @@ const resolveGeometryUrl = (geometryUrl: string) => {
   return `https://media.githubusercontent.com/media/${owner}/${repository}/${reference}/${path}`;
 };
 
+const argentinaBoundarySource = (level: AdministrativeLevel) => {
+  const filename = level === "ADM1" ? "argentina-adm1.json" : "argentina-adm2.json";
+  const resource = level === "ADM1" ? "provincias" : "departamentos";
+  const geometryUrl = `${import.meta.env.BASE_URL}cartography/${filename}`;
+  const metadata: BoundaryMetadata = {
+    boundaryName: "Argentina",
+    boundaryISO: "ARG",
+    boundaryCanonical: "Georef Argentina v2.0",
+    boundarySource: "IGN / Georef Argentina",
+    boundaryLicense: "Datos oficiales",
+    admUnitCount: level === "ADM1" ? "24" : "528",
+    simplifiedGeometryGeoJSON: geometryUrl,
+    gjDownloadURL: `https://apis.datos.gob.ar/georef/api/v2.0/${resource}.geojson`,
+    sourceLabel: "Georef Argentina",
+    sourceUrl: "https://www.argentina.gob.ar/georef",
+  };
+  return { geometryUrl, metadata };
+};
+
 const getAdministrativeDivisions = async (
   iso3: string,
   level: AdministrativeLevel,
@@ -131,21 +152,29 @@ const getAdministrativeDivisions = async (
   const cached = boundaryCache.get(cacheKey);
   if (cached) return cached;
 
-  let metadataResponse: Response;
-  try {
-    metadataResponse = await fetch(
-      `https://www.geoboundaries.org/api/current/gbOpen/${encodeURIComponent(iso3)}/${level}/`,
-    );
-  } catch {
-    throw new Error("No se pudo conectar con el servicio cartografico.");
-  }
-  if (!metadataResponse.ok) {
-    throw new Error("Este pais no tiene divisiones administrativas disponibles.");
-  }
+  let metadata: BoundaryMetadata;
+  let resolvedGeometryUrl: string;
+  if (iso3 === "ARG") {
+    const argentinaSource = argentinaBoundarySource(level);
+    metadata = argentinaSource.metadata;
+    resolvedGeometryUrl = argentinaSource.geometryUrl;
+  } else {
+    let metadataResponse: Response;
+    try {
+      metadataResponse = await fetch(
+        `https://www.geoboundaries.org/api/current/gbOpen/${encodeURIComponent(iso3)}/${level}/`,
+      );
+    } catch {
+      throw new Error("No se pudo conectar con el servicio cartografico.");
+    }
+    if (!metadataResponse.ok) {
+      throw new Error("Este pais no tiene divisiones administrativas disponibles.");
+    }
 
-  const metadata = await metadataResponse.json() as BoundaryMetadata;
-  const geometryUrl = metadata.simplifiedGeometryGeoJSON || metadata.gjDownloadURL;
-  const resolvedGeometryUrl = resolveGeometryUrl(geometryUrl);
+    metadata = await metadataResponse.json() as BoundaryMetadata;
+    const geometryUrl = metadata.simplifiedGeometryGeoJSON || metadata.gjDownloadURL;
+    resolvedGeometryUrl = resolveGeometryUrl(geometryUrl);
+  }
 
   let geometryResponse: Response;
   try {
@@ -265,13 +294,24 @@ const representativePoint = (feature: GeoFeature) => {
 export const featuresWithinFeature = (
   collection: GeoFeatureCollection,
   parent: GeoFeature,
-): GeoFeatureCollection => ({
-  type: "FeatureCollection",
-  features: collection.features.filter((feature) => {
-    const point = representativePoint(feature);
-    return point ? pointInFeature(point, parent) : false;
-  }),
-});
+): GeoFeatureCollection => {
+  const parentId = valueAsString(parent.properties.shapeID);
+  const linkedFeatures = parentId
+    ? collection.features.filter(
+      (feature) => valueAsString(feature.properties.parentId) === parentId,
+    )
+    : [];
+
+  return {
+    type: "FeatureCollection",
+    features: linkedFeatures.length > 0
+      ? linkedFeatures
+      : collection.features.filter((feature) => {
+        const point = representativePoint(feature);
+        return point ? pointInFeature(point, parent) : false;
+      }),
+  };
+};
 
 export const collectionAspect = (collection: GeoFeatureCollection) => {
   let minimumLongitude = Number.POSITIVE_INFINITY;

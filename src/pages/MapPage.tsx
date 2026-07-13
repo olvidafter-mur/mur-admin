@@ -327,6 +327,9 @@ export default function MapPage({
   const showDivisionLabels = Boolean(
     activeCollection && countryLayer && activeCollection.features.length <= 40,
   );
+  const activeBoundaryMetadata = subdivisionLayer?.subdivisions.metadata
+    ?? countryLayer?.divisions.metadata
+    ?? null;
 
   const mapOption = useMemo<ChartOption>(() => {
     const palette = theme === "dark"
@@ -672,11 +675,16 @@ export default function MapPage({
               <div className="map-no-posts-note">No hay publicaciones para los filtros actuales en {scopeLabel}.</div>
             ) : null}
 
-            {countryLayer ? (
+            {countryLayer && activeBoundaryMetadata ? (
               <footer className="map-attribution">
-                Limites: {(subdivisionLayer?.subdivisions ?? countryLayer.divisions).metadata.boundarySource} ·{" "}
-                {(subdivisionLayer?.subdivisions ?? countryLayer.divisions).metadata.boundaryLicense} ·{" "}
-                <a href="https://www.geoboundaries.org/" target="_blank" rel="noreferrer">geoBoundaries</a>
+                Limites: {activeBoundaryMetadata.boundarySource} · {activeBoundaryMetadata.boundaryLicense} ·{" "}
+                <a
+                  href={activeBoundaryMetadata.sourceUrl ?? "https://www.geoboundaries.org/"}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  {activeBoundaryMetadata.sourceLabel ?? "geoBoundaries"}
+                </a>
               </footer>
             ) : null}
           </div>
