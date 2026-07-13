@@ -37,6 +37,8 @@ export type CountryDivisions = {
   metadata: BoundaryMetadata;
 };
 
+type AdministrativeLevel = "ADM1" | "ADM2";
+
 const boundaryCache = new Map<string, CountryDivisions>();
 
 const valueAsString = (value: unknown) =>
@@ -121,14 +123,18 @@ const resolveGeometryUrl = (geometryUrl: string) => {
   return `https://media.githubusercontent.com/media/${owner}/${repository}/${reference}/${path}`;
 };
 
-export const getCountryDivisions = async (iso3: string) => {
-  const cached = boundaryCache.get(iso3);
+const getAdministrativeDivisions = async (
+  iso3: string,
+  level: AdministrativeLevel,
+) => {
+  const cacheKey = `${iso3}-${level}`;
+  const cached = boundaryCache.get(cacheKey);
   if (cached) return cached;
 
   let metadataResponse: Response;
   try {
     metadataResponse = await fetch(
-      `https://www.geoboundaries.org/api/current/gbOpen/${encodeURIComponent(iso3)}/ADM1/`,
+      `https://www.geoboundaries.org/api/current/gbOpen/${encodeURIComponent(iso3)}/${level}/`,
     );
   } catch {
     throw new Error("No se pudo conectar con el servicio cartografico.");
@@ -148,7 +154,7 @@ export const getCountryDivisions = async (iso3: string) => {
     throw new Error("No se pudo conectar con el servicio cartografico.");
   }
   if (!geometryResponse.ok) {
-    throw new Error("No se pudieron cargar las provincias de este pais.");
+    throw new Error("No se pudieron cargar las divisiones de este pais.");
   }
 
   const collection = normalizeDivisionCollection(
@@ -159,9 +165,15 @@ export const getCountryDivisions = async (iso3: string) => {
   }
 
   const result = { collection, metadata };
-  boundaryCache.set(iso3, result);
+  boundaryCache.set(cacheKey, result);
   return result;
 };
+
+export const getCountryDivisions = (iso3: string) =>
+  getAdministrativeDivisions(iso3, "ADM1");
+
+export const getCountrySubdivisions = (iso3: string) =>
+  getAdministrativeDivisions(iso3, "ADM2");
 
 const normalizeLongitude = (longitude: number, reference: number) => {
   let normalized = longitude;
@@ -201,6 +213,65 @@ export const pointInFeature = (point: GeoPosition, feature: GeoFeature) => {
   }
   return feature.geometry.coordinates.some((polygon) => pointInPolygon(point, polygon));
 };
+
+const outerRings = (feature: GeoFeature) => (
+  feature.geometry.type === "Polygon"
+    ? [feature.geometry.coordinates[0]]
+    : feature.geometry.coordinates.map((polygon) => polygon[0])
+);
+
+const ringCentroid = (ring: GeoPosition[]) => {
+  let doubleArea = 0;
+  let longitude = 0;
+  let latitude = 0;
+
+  for (let index = 0, previous = ring.length - 1; index < ring.length; previous = index++) {
+    const cross = ring[previous][0] * ring[index][1] - ring[index][0] * ring[previous][1];
+    doubleArea += cross;
+    longitude += (ring[previous][0] + ring[index][0]) * cross;
+    latitude += (ring[previous][1] + ring[index][1]) * cross;
+  }
+
+  return {
+    area: Math.abs(doubleArea / 2),
+    point: Math.abs(doubleArea) > Number.EPSILON
+      ? [longitude / (3 * doubleArea), latitude / (3 * doubleArea)] as GeoPosition
+      : ring[0],
+  };
+};
+
+const representativePoint = (feature: GeoFeature) => {
+  const rings = outerRings(feature)
+    .filter((ring): ring is GeoPosition[] => Boolean(ring?.length))
+    .map((ring) => ({ ring, ...ringCentroid(ring) }))
+    .sort((left, right) => right.area - left.area);
+  const centroid = rings[0]?.point;
+  if (!centroid || pointInFeature(centroid, feature)) return centroid;
+
+  for (const { ring } of rings) {
+    const step = Math.max(1, Math.floor(ring.length / 64));
+    for (let index = 0; index < ring.length; index += step) {
+      const candidate: GeoPosition = [
+        ring[index][0] * 0.995 + centroid[0] * 0.005,
+        ring[index][1] * 0.995 + centroid[1] * 0.005,
+      ];
+      if (pointInFeature(candidate, feature)) return candidate;
+    }
+  }
+
+  return centroid;
+};
+
+export const featuresWithinFeature = (
+  collection: GeoFeatureCollection,
+  parent: GeoFeature,
+): GeoFeatureCollection => ({
+  type: "FeatureCollection",
+  features: collection.features.filter((feature) => {
+    const point = representativePoint(feature);
+    return point ? pointInFeature(point, parent) : false;
+  }),
+});
 
 export const collectionAspect = (collection: GeoFeatureCollection) => {
   let minimumLongitude = Number.POSITIVE_INFINITY;

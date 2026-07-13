@@ -28,9 +28,11 @@ import {
 import { getGlobalPostMap } from "../lib/adminApi";
 import { displayName, formatDate, formatNumber, truncate } from "../lib/format";
 import {
+  featuresWithinFeature,
   featureName,
   fittedLayoutSize,
   getCountryDivisions,
+  getCountrySubdivisions,
   normalizeWorldCollection,
   pointInFeature,
   type CountryDivisions,
@@ -70,6 +72,13 @@ type CountryLayer = {
   mapName: string;
 };
 
+type SubdivisionLayer = {
+  division: GeoFeature;
+  subdivisions: CountryDivisions;
+  collection: GeoFeatureCollection;
+  mapName: string;
+};
+
 const coordinates = (post: GlobalMapPost) =>
   `${post.latitude.toFixed(5)}, ${post.longitude.toFixed(5)}`;
 
@@ -89,6 +98,8 @@ export default function MapPage({
   const [countries, setCountries] = useState<CountryReference[]>([]);
   const [countryLayer, setCountryLayer] = useState<CountryLayer | null>(null);
   const [selectedDivision, setSelectedDivision] = useState<GeoFeature | null>(null);
+  const [subdivisionLayer, setSubdivisionLayer] = useState<SubdivisionLayer | null>(null);
+  const [selectedSubdivision, setSelectedSubdivision] = useState<GeoFeature | null>(null);
   const [mapViewport, setMapViewport] = useState({ width: 0, height: 0 });
   const [mapReady, setMapReady] = useState(false);
   const [mapError, setMapError] = useState<string | null>(null);
@@ -189,6 +200,8 @@ export default function MapPage({
       );
       setCountryLayer({ country, divisions, mapName });
       setSelectedDivision(null);
+      setSubdivisionLayer(null);
+      setSelectedSubdivision(null);
     } catch (loadError) {
       if (requestId === drillRequestRef.current) {
         setDrillError(
@@ -202,24 +215,77 @@ export default function MapPage({
     }
   }, []);
 
+  const enterDivision = useCallback(async (division: GeoFeature) => {
+    if (!countryLayer) return;
+
+    const requestId = ++drillRequestRef.current;
+    setDrillLoading(true);
+    setDrillError(null);
+
+    try {
+      const subdivisions = await getCountrySubdivisions(countryLayer.country.iso3);
+      if (requestId !== drillRequestRef.current) return;
+
+      const collection = featuresWithinFeature(subdivisions.collection, division);
+      if (collection.features.length === 0) {
+        throw new Error("Esta provincia no tiene divisiones administrativas disponibles.");
+      }
+
+      const divisionKey = String(
+        division.properties.shapeID ?? featureName(division),
+      ).replace(/[^a-zA-Z0-9]+/g, "-");
+      const mapName = `mur-adm2-${countryLayer.country.iso3.toLowerCase()}-${divisionKey}`;
+      registerMap(
+        mapName,
+        collection as Parameters<typeof registerMap>[1],
+      );
+      setSelectedDivision(division);
+      setSubdivisionLayer({ division, subdivisions, collection, mapName });
+      setSelectedSubdivision(null);
+    } catch (loadError) {
+      if (requestId === drillRequestRef.current) {
+        setDrillError(
+          loadError instanceof Error
+            ? loadError.message
+            : "No se pudieron cargar las divisiones de esta provincia.",
+        );
+      }
+    } finally {
+      if (requestId === drillRequestRef.current) setDrillLoading(false);
+    }
+  }, [countryLayer]);
+
   const showWorld = () => {
     drillRequestRef.current += 1;
     setCountryLayer(null);
     setSelectedDivision(null);
+    setSubdivisionLayer(null);
+    setSelectedSubdivision(null);
+    setDrillLoading(false);
+    setDrillError(null);
+  };
+
+  const showCountry = () => {
+    drillRequestRef.current += 1;
+    setSelectedDivision(null);
+    setSubdivisionLayer(null);
+    setSelectedSubdivision(null);
     setDrillLoading(false);
     setDrillError(null);
   };
 
   const scopedItems = useMemo(() => {
     const items = data?.items ?? [];
-    const boundary = selectedDivision ?? countryLayer?.country.feature;
+    const boundary = selectedSubdivision
+      ?? selectedDivision
+      ?? countryLayer?.country.feature;
     if (!boundary) return items;
 
     return items.filter((post) => pointInFeature(
       [post.longitude, post.latitude],
       boundary,
     ));
-  }, [countryLayer, data, selectedDivision]);
+  }, [countryLayer, data, selectedDivision, selectedSubdivision]);
 
   const filteredItems = useMemo(() => {
     const query = search.trim().toLocaleLowerCase("es");
@@ -245,17 +311,21 @@ export default function MapPage({
   }, [filteredItems]);
 
   const selectedPost = filteredItems.find((post) => post.id === selectedId) ?? null;
-  const activeCollection = countryLayer?.divisions.collection ?? worldCollection;
+  const activeCollection = subdivisionLayer?.collection
+    ?? countryLayer?.divisions.collection
+    ?? worldCollection;
   const mapLayoutSize = useMemo(() => fittedLayoutSize(
     activeCollection,
     mapViewport.width,
     mapViewport.height,
   ), [activeCollection, mapViewport]);
-  const scopeLabel = selectedDivision
+  const scopeLabel = selectedSubdivision
+    ? featureName(selectedSubdivision)
+    : selectedDivision
     ? featureName(selectedDivision)
     : countryLayer?.country.name ?? "Mundo";
   const showDivisionLabels = Boolean(
-    countryLayer && countryLayer.divisions.collection.features.length <= 40,
+    activeCollection && countryLayer && activeCollection.features.length <= 40,
   );
 
   const mapOption = useMemo<ChartOption>(() => {
@@ -362,7 +432,7 @@ export default function MapPage({
         textStyle: { color: palette.muted, fontSize: 11 },
       },
       geo: {
-        map: countryLayer?.mapName ?? MAP_NAME,
+        map: subdivisionLayer?.mapName ?? countryLayer?.mapName ?? MAP_NAME,
         aspectScale: 1,
         roam: true,
         zoom: 1,
@@ -387,8 +457,8 @@ export default function MapPage({
           },
           itemStyle: { areaColor: palette.landHover },
         },
-        regions: selectedDivision ? [{
-          name: featureName(selectedDivision),
+        regions: selectedSubdivision ? [{
+          name: featureName(selectedSubdivision),
           itemStyle: {
             areaColor: palette.selectedLand,
             borderColor: palette.selectedBorder,
@@ -399,7 +469,7 @@ export default function MapPage({
       },
       series,
     };
-  }, [countryLayer, filteredItems, mapLayoutSize, scopeLabel, selectedDivision, showDivisionLabels, theme]);
+  }, [countryLayer, filteredItems, mapLayoutSize, scopeLabel, selectedSubdivision, showDivisionLabels, subdivisionLayer, theme]);
 
   const handleMapClick = (params: unknown) => {
     const event = params as {
@@ -414,11 +484,19 @@ export default function MapPage({
     }
 
     if (event.componentType !== "geo" || typeof event.name !== "string") return;
+    if (subdivisionLayer) {
+      const subdivision = subdivisionLayer.collection.features.find(
+        (feature) => featureName(feature) === event.name,
+      );
+      if (subdivision) setSelectedSubdivision(subdivision);
+      return;
+    }
+
     if (countryLayer) {
       const division = countryLayer.divisions.collection.features.find(
         (feature) => featureName(feature) === event.name,
       );
-      if (division) setSelectedDivision(division);
+      if (division) void enterDivision(division);
       return;
     }
 
@@ -527,7 +605,7 @@ export default function MapPage({
                         className={!selectedDivision ? "is-current" : ""}
                         type="button"
                         aria-current={!selectedDivision ? "location" : undefined}
-                        onClick={() => setSelectedDivision(null)}
+                        onClick={showCountry}
                       >
                         {countryLayer.country.name}
                       </button>
@@ -536,19 +614,38 @@ export default function MapPage({
                   {selectedDivision ? (
                     <>
                       <ChevronRight size={13} />
-                      <span>{featureName(selectedDivision)}</span>
+                      <button
+                        className={!selectedSubdivision ? "is-current" : ""}
+                        type="button"
+                        aria-current={!selectedSubdivision ? "location" : undefined}
+                        onClick={() => setSelectedSubdivision(null)}
+                      >
+                        {featureName(selectedDivision)}
+                      </button>
+                    </>
+                  ) : null}
+                  {selectedSubdivision ? (
+                    <>
+                      <ChevronRight size={13} />
+                      <span>{featureName(selectedSubdivision)}</span>
                     </>
                   ) : null}
                 </nav>
                 <h2>
-                  {countryLayer
+                  {subdivisionLayer
+                    ? `Division departamental de ${featureName(subdivisionLayer.division)}`
+                    : countryLayer
                     ? `Division politica de ${countryLayer.country.name}`
                     : "Distribucion mundial de publicaciones"}
                 </h2>
               </div>
               <span className="map-interaction-hint">
                 <MousePointer2 size={14} />
-                {countryLayer ? "Selecciona una provincia para filtrar" : "Selecciona un pais para ver sus provincias"}
+                {subdivisionLayer
+                  ? "Selecciona un departamento para filtrar"
+                  : countryLayer
+                    ? "Selecciona una provincia para ver sus departamentos"
+                    : "Selecciona un pais para ver sus provincias"}
               </span>
             </header>
 
@@ -577,7 +674,8 @@ export default function MapPage({
 
             {countryLayer ? (
               <footer className="map-attribution">
-                Limites: {countryLayer.divisions.metadata.boundarySource} · {countryLayer.divisions.metadata.boundaryLicense} ·{" "}
+                Limites: {(subdivisionLayer?.subdivisions ?? countryLayer.divisions).metadata.boundarySource} ·{" "}
+                {(subdivisionLayer?.subdivisions ?? countryLayer.divisions).metadata.boundaryLicense} ·{" "}
                 <a href="https://www.geoboundaries.org/" target="_blank" rel="noreferrer">geoBoundaries</a>
               </footer>
             ) : null}
