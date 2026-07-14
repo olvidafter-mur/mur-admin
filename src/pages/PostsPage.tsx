@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState, type FormEvent } from "react";
 import {
   Eye,
   EyeOff,
+  ExternalLink,
   Heart,
   LoaderCircle,
   MessageCircle,
@@ -23,6 +24,10 @@ import {
 } from "../components/ui";
 
 const PAGE_SIZE = 25;
+const POST_SHARE_BASE_URL = "https://mur.olvidaftech.com/p";
+
+const postShareUrl = (post: PostRow) =>
+  `${POST_SHARE_BASE_URL}/${encodeURIComponent(post.share_slug || post.id)}`;
 
 const statusLabel = {
   visible: "Visible",
@@ -171,18 +176,30 @@ export default function PostsPage({
                         {post.moderation_reason ? <span className="cell-subline" title={post.moderation_reason}>{truncate(post.moderation_reason, 36)}</span> : null}
                       </td>
                       <td className="cell-muted">{formatDate(post.created_at)}</td>
-                      <td className="cell-actions">
-                        {post.status !== "deleted" ? (
-                          <button
-                            className={post.status === "visible" ? "icon-button icon-button-danger" : "icon-button icon-button-success"}
-                            type="button"
-                            title={post.status === "visible" ? "Ocultar publicacion" : "Restaurar publicacion"}
-                            aria-label={post.status === "visible" ? "Ocultar publicacion" : "Restaurar publicacion"}
-                            onClick={() => setTarget(post)}
+                      <td className="cell-actions post-cell-actions">
+                        <div className="post-row-actions">
+                          <a
+                            className="button button-secondary post-open-button"
+                            href={postShareUrl(post)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            aria-label={`Abrir post ${post.id.slice(0, 8)}`}
                           >
-                            {post.status === "visible" ? <EyeOff size={17} /> : <Eye size={17} />}
-                          </button>
-                        ) : null}
+                            <ExternalLink size={15} />
+                            <span>Abrir post</span>
+                          </a>
+                          {post.status !== "deleted" ? (
+                            <button
+                              className={post.status === "visible" ? "icon-button icon-button-danger" : "icon-button icon-button-success"}
+                              type="button"
+                              title={post.status === "visible" ? "Ocultar publicacion" : "Restaurar publicacion"}
+                              aria-label={post.status === "visible" ? "Ocultar publicacion" : "Restaurar publicacion"}
+                              onClick={() => setTarget(post)}
+                            >
+                              {post.status === "visible" ? <EyeOff size={17} /> : <Eye size={17} />}
+                            </button>
+                          ) : null}
+                        </div>
                       </td>
                     </tr>
                   ))}

@@ -1,4 +1,5 @@
 import { useEffect, useRef, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import {
   AlertCircle,
   ChevronLeft,
@@ -224,7 +225,7 @@ export const Modal = ({
 
   if (!open) return null;
 
-  return (
+  return createPortal(
     <div className="modal-backdrop" role="presentation" onMouseDown={onClose}>
       <section
         ref={modalRef}
@@ -252,6 +253,7 @@ export const Modal = ({
         </header>
         {children}
       </section>
-    </div>
+    </div>,
+    document.body,
   );
 };

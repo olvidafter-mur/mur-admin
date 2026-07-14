@@ -7,6 +7,7 @@ import {
   Layers3,
   LoaderCircle,
   LockKeyhole,
+  Map as MapIcon,
   MapPin,
   MessageCircle,
   MousePointer2,
@@ -18,6 +19,7 @@ import DataChart, {
   registerMap,
   type ChartOption,
 } from "../components/DataChart";
+import StreetPostMap from "../components/StreetPostMap";
 import {
   Avatar,
   Badge,
@@ -50,6 +52,7 @@ import type {
 } from "../types";
 
 const MAP_NAME = "mur-world";
+type MapView = "political" | "street";
 
 const statusCopy = {
   visible: { label: "Visible", plural: "Visibles", tone: "success" },
@@ -100,6 +103,7 @@ export default function MapPage({
   const [selectedDivision, setSelectedDivision] = useState<GeoFeature | null>(null);
   const [subdivisionLayer, setSubdivisionLayer] = useState<SubdivisionLayer | null>(null);
   const [selectedSubdivision, setSelectedSubdivision] = useState<GeoFeature | null>(null);
+  const [mapView, setMapView] = useState<MapView>("street");
   const [mapViewport, setMapViewport] = useState({ width: 0, height: 0 });
   const [mapReady, setMapReady] = useState(false);
   const [mapError, setMapError] = useState<string | null>(null);
@@ -182,7 +186,7 @@ export default function MapPage({
     observer.observe(chart);
 
     return () => observer.disconnect();
-  }, [data, mapReady]);
+  }, [data, mapReady, mapView]);
 
   const enterCountry = useCallback(async (country: CountryReference) => {
     const requestId = ++drillRequestRef.current;
@@ -330,6 +334,15 @@ export default function MapPage({
   const activeBoundaryMetadata = subdivisionLayer?.subdivisions.metadata
     ?? countryLayer?.divisions.metadata
     ?? null;
+  const mapScopeKey = [
+    countryLayer?.country.iso3 ?? "world",
+    selectedDivision
+      ? String(selectedDivision.properties.shapeID ?? featureName(selectedDivision))
+      : "",
+    selectedSubdivision
+      ? String(selectedSubdivision.properties.shapeID ?? featureName(selectedSubdivision))
+      : "",
+  ].join(":");
 
   const mapOption = useMemo<ChartOption>(() => {
     const palette = theme === "dark"
@@ -583,7 +596,7 @@ export default function MapPage({
       </div>
 
       {error ? <ErrorState message={error} /> : null}
-      {mapError ? <ErrorState message={mapError} /> : null}
+      {mapError && mapView === "political" ? <ErrorState message={mapError} /> : null}
       {drillError ? <ErrorState message={drillError} /> : null}
       {loading && !data ? <LoadingState label="Cargando publicaciones geolocalizadas" /> : null}
 
@@ -642,17 +655,47 @@ export default function MapPage({
                     : "Distribucion mundial de publicaciones"}
                 </h2>
               </div>
-              <span className="map-interaction-hint">
-                <MousePointer2 size={14} />
-                {subdivisionLayer
-                  ? "Selecciona un departamento para filtrar"
-                  : countryLayer
-                    ? "Selecciona una provincia para ver sus departamentos"
-                    : "Selecciona un pais para ver sus provincias"}
-              </span>
+              <div className="map-panel-tools">
+                <div className="map-view-switch" role="group" aria-label="Vista del mapa">
+                  <button
+                    className={mapView === "political" ? "is-active" : ""}
+                    type="button"
+                    aria-pressed={mapView === "political"}
+                    onClick={() => setMapView("political")}
+                  >
+                    <Globe2 size={14} /> Politico
+                  </button>
+                  <button
+                    className={mapView === "street" ? "is-active" : ""}
+                    type="button"
+                    aria-pressed={mapView === "street"}
+                    onClick={() => setMapView("street")}
+                  >
+                    <MapIcon size={14} /> Mapa
+                  </button>
+                </div>
+                <span className="map-interaction-hint">
+                  <MousePointer2 size={14} />
+                  {mapView === "street"
+                    ? "Arrastra, acerca o selecciona un punto"
+                    : subdivisionLayer
+                      ? "Selecciona un departamento para filtrar"
+                      : countryLayer
+                        ? "Selecciona una provincia para ver sus departamentos"
+                        : "Selecciona un pais para ver sus provincias"}
+                </span>
+              </div>
             </header>
 
-            {mapReady ? (
+            {mapView === "street" ? (
+              <StreetPostMap
+                posts={filteredItems}
+                selectedId={selectedId}
+                scopeKey={mapScopeKey}
+                theme={theme}
+                onSelect={setSelectedId}
+              />
+            ) : mapReady ? (
               <DataChart
                 className="data-chart-world"
                 option={mapOption}
@@ -675,7 +718,7 @@ export default function MapPage({
               <div className="map-no-posts-note">No hay publicaciones para los filtros actuales en {scopeLabel}.</div>
             ) : null}
 
-            {countryLayer && activeBoundaryMetadata ? (
+            {mapView === "political" && countryLayer && activeBoundaryMetadata ? (
               <footer className="map-attribution">
                 Limites: {activeBoundaryMetadata.boundarySource} · {activeBoundaryMetadata.boundaryLicense} ·{" "}
                 <a
