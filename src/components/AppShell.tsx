@@ -4,7 +4,9 @@ import {
   ChevronRight,
   FileText,
   Globe2,
+  LoaderCircle,
   LogOut,
+  Send,
   ShieldAlert,
   ShieldCheck,
   UsersRound,
@@ -21,6 +23,7 @@ const navItems: Array<{
 }> = [
   { id: "dashboard", label: "Inteligencia", description: "Pulso y patrones", icon: Activity },
   { id: "map", label: "Mapa global", description: "Actividad geolocalizada", icon: Globe2 },
+  { id: "publish", label: "Publicar", description: "Crear contenido", icon: Send },
   { id: "reports", label: "Reportes", description: "Cola de decisiones", icon: ShieldAlert },
   { id: "posts", label: "Publicaciones", description: "Contenido y estado", icon: FileText },
   { id: "users", label: "Usuarios", description: "Perfiles y acceso", icon: UsersRound },
@@ -33,6 +36,7 @@ export default function AppShell({
   children,
   onNavigate,
   onSignOut,
+  signingOut,
   onToggleTheme,
 }: {
   admin: AdminUser;
@@ -41,6 +45,7 @@ export default function AppShell({
   children: ReactNode;
   onNavigate: (view: AdminView) => void;
   onSignOut: () => void;
+  signingOut: boolean;
   onToggleTheme: () => void;
 }) {
   const activeItem = navItems.find((item) => item.id === view) ?? navItems[0];
@@ -90,9 +95,10 @@ export default function AppShell({
             type="button"
             title="Cerrar sesion"
             aria-label="Cerrar sesion"
+            disabled={signingOut}
             onClick={onSignOut}
           >
-            <LogOut size={17} />
+            {signingOut ? <LoaderCircle className="spin" size={17} /> : <LogOut size={17} />}
           </button>
         </div>
       </aside>
@@ -127,9 +133,10 @@ export default function AppShell({
             type="button"
             title="Cerrar sesion"
             aria-label="Cerrar sesion"
+            disabled={signingOut}
             onClick={onSignOut}
           >
-            <LogOut size={18} />
+            {signingOut ? <LoaderCircle className="spin" size={18} /> : <LogOut size={18} />}
           </button>
         </div>
       </div>

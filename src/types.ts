@@ -1,4 +1,4 @@
-export type AdminView = "dashboard" | "map" | "reports" | "posts" | "users";
+export type AdminView = "dashboard" | "map" | "publish" | "reports" | "posts" | "users";
 export type Theme = "light" | "dark";
 
 export type AdminUser = {
@@ -7,6 +7,34 @@ export type AdminUser = {
   username: string | null;
   display_name: string | null;
   avatar_url: string | null;
+};
+
+export type PostComposerCategory = {
+  id: string;
+  slug: string;
+  name: string;
+  color: string | null;
+  icon: string | null;
+};
+
+export type PostComposerOptions = {
+  categories: PostComposerCategory[];
+  content_limit: number;
+  expires_in_hours: number;
+};
+
+export type AdminCreatedPost = {
+  id: string;
+  share_slug: string;
+  content: string;
+  created_at: string;
+  category_id: string;
+  category_slug: string;
+  category_name: string;
+  latitude: number;
+  longitude: number;
+  share_location: boolean;
+  expires_at: string;
 };
 
 export type DashboardMetrics = {
@@ -77,6 +105,27 @@ export type CategoryInsight = {
   interactions: number;
   reports: number;
   report_rate: number;
+};
+
+export type ActivityHistoryOverview = Pick<
+  AnalyticsOverview,
+  | "users_new"
+  | "active_users"
+  | "active_users_previous"
+  | "posts"
+  | "posts_previous"
+  | "interactions"
+  | "interactions_previous"
+  | "reports"
+  | "reports_previous"
+>;
+
+export type AdminActivityHistory = {
+  generated_at: string;
+  window_days: AnalyticsRange;
+  overview: ActivityHistoryOverview;
+  timeseries: AnalyticsPoint[];
+  categories: CategoryInsight[];
 };
 
 export type AudienceSegment = {

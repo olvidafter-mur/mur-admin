@@ -10,11 +10,12 @@ import type { AdminUser, AdminView, Theme } from "./types";
 
 const DashboardPage = lazy(() => import("./pages/DashboardPage"));
 const MapPage = lazy(() => import("./pages/MapPage"));
+const PublishPage = lazy(() => import("./pages/PublishPage"));
 const PostsPage = lazy(() => import("./pages/PostsPage"));
 const ReportsPage = lazy(() => import("./pages/ReportsPage"));
 const UsersPage = lazy(() => import("./pages/UsersPage"));
 
-const validViews: AdminView[] = ["dashboard", "map", "reports", "posts", "users"];
+const validViews: AdminView[] = ["dashboard", "map", "publish", "reports", "posts", "users"];
 
 const getViewFromHash = (): AdminView => {
   const hash = window.location.hash.replace("#", "") as AdminView;
@@ -78,6 +79,7 @@ export default function App() {
   const [view, setView] = useState<AdminView>(getViewFromHash);
   const [authLoading, setAuthLoading] = useState(true);
   const [adminLoading, setAdminLoading] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
   const [accessDenied, setAccessDenied] = useState(false);
   const [toast, setToast] = useState<{ message: string; tone: "success" | "danger" } | null>(null);
   const sessionUserId = session?.user.id ?? null;
@@ -179,9 +181,36 @@ export default function App() {
     }
   };
 
-  const signOut = useCallback(() => {
-    void requireSupabase().auth.signOut();
-  }, []);
+  const signOut = useCallback(async () => {
+    if (signingOut) return;
+
+    setSigningOut(true);
+    try {
+      const { error: signOutError } = await requireSupabase().auth.signOut({
+        scope: "local",
+      });
+      const sessionAlreadyMissing = signOutError?.message
+        .toLowerCase()
+        .includes("auth session missing");
+      if (signOutError && !sessionAlreadyMissing) throw signOutError;
+
+      setSession(null);
+      setAdmin(null);
+      setAccessDenied(false);
+      setAdminLoading(false);
+      setAuthLoading(false);
+      window.location.hash = "";
+    } catch (signOutError) {
+      setToast({
+        message: signOutError instanceof Error
+          ? signOutError.message
+          : "No se pudo cerrar la sesion.",
+        tone: "danger",
+      });
+    } finally {
+      setSigningOut(false);
+    }
+  }, [signingOut]);
 
   const notify = useCallback((message: string, tone: "success" | "danger" = "success") => {
     setToast({ message, tone });
@@ -194,7 +223,7 @@ export default function App() {
   if (!isSupabaseConfigured) return <ConfigurationRequired />;
   if (authLoading || adminLoading) return <FullPageLoader />;
   if (!session) return <LoginPage theme={theme} onToggleTheme={toggleTheme} />;
-  if (accessDenied || !admin) return <AccessDenied onSignOut={signOut} />;
+  if (accessDenied || !admin) return <AccessDenied onSignOut={() => void signOut()} />;
 
   return (
     <>
@@ -204,12 +233,21 @@ export default function App() {
         view={view}
         theme={theme}
         onNavigate={navigate}
-        onSignOut={signOut}
+        signingOut={signingOut}
+        onSignOut={() => void signOut()}
         onToggleTheme={toggleTheme}
       >
         <Suspense fallback={<ViewLoader />}>
           {view === "dashboard" ? <DashboardPage theme={theme} onNavigate={navigate} /> : null}
           {view === "map" ? <MapPage theme={theme} onNavigate={navigate} /> : null}
+          {view === "publish" ? (
+            <PublishPage
+              admin={admin}
+              theme={theme}
+              notify={notify}
+              onNavigate={navigate}
+            />
+          ) : null}
           {view === "reports" ? <ReportsPage notify={notify} /> : null}
           {view === "posts" ? <PostsPage notify={notify} /> : null}
           {view === "users" ? <UsersPage notify={notify} /> : null}

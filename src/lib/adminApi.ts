@@ -1,12 +1,15 @@
 import { requireSupabase } from "./supabase";
 import type {
+  AdminActivityHistory,
   AdminAnalyticsData,
+  AdminCreatedPost,
   AdminUser,
   AnalyticsRange,
   DashboardData,
   GlobalPostMapData,
   PaginatedResult,
   PostDetail,
+  PostComposerOptions,
   PostMapRange,
   PostMapStatus,
   PostRow,
@@ -30,11 +33,47 @@ const rpc = async <T>(
 
 export const getAdminMe = () => rpc<AdminUser>("admin_get_me");
 
+export const getPostComposerOptions = () =>
+  rpc<PostComposerOptions>("admin_get_post_composer_options");
+
+export const createAdminPost = (input: {
+  content: string;
+  categoryId: string;
+  latitude: number;
+  longitude: number;
+  shareLocation: boolean;
+}) =>
+  rpc<AdminCreatedPost>("admin_create_post", {
+    _content: input.content,
+    _category_id: input.categoryId,
+    _latitude: input.latitude,
+    _longitude: input.longitude,
+    _share_location: input.shareLocation,
+  });
+
 export const getDashboard = () =>
   rpc<DashboardData>("admin_get_dashboard");
 
-export const getAnalytics = (days: AnalyticsRange) =>
-  rpc<AdminAnalyticsData>("admin_get_analytics", { _days: days });
+export const getAnalytics = async (
+  days: AnalyticsRange,
+): Promise<AdminAnalyticsData> => {
+  const [analytics, history] = await Promise.all([
+    rpc<AdminAnalyticsData>("admin_get_analytics", { _days: days }),
+    rpc<AdminActivityHistory>("admin_get_activity_history", { _days: days }),
+  ]);
+
+  return {
+    ...analytics,
+    generated_at: history.generated_at,
+    window_days: history.window_days,
+    overview: {
+      ...analytics.overview,
+      ...history.overview,
+    },
+    timeseries: history.timeseries,
+    categories: history.categories,
+  };
+};
 
 export const listUsers = (params: {
   search?: string;
