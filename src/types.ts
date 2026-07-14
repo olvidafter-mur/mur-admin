@@ -167,6 +167,92 @@ export type PostRow = {
   moderated_at: string | null;
 };
 
+export type PostDetailPost = PostRow & {
+  visibility: string | null;
+  author_email: string | null;
+  is_verified: boolean;
+  is_edited: boolean;
+  edited_at: string | null;
+  share_location: boolean;
+  latitude: number | null;
+  longitude: number | null;
+  moderated_by: string | null;
+};
+
+export type PostDetailMedia = {
+  id: string;
+  media_type: "image" | "audio";
+  public_url: string;
+  mime_type: string;
+  size_bytes: number;
+  duration_seconds: number | null;
+  width: number | null;
+  height: number | null;
+  sort_order: number;
+  created_at: string;
+};
+
+export type PostDetailPollOption = {
+  id: string;
+  option_text: string;
+  sort_order: number;
+  votes_count: number;
+};
+
+export type PostDetailPoll = {
+  id: string;
+  question: string;
+  created_at: string;
+  total_votes: number;
+  options: PostDetailPollOption[];
+};
+
+export type PostDetailLike = {
+  user_id: string;
+  username: string | null;
+  display_name: string | null;
+  avatar_url: string | null;
+  is_verified: boolean;
+  created_at: string;
+};
+
+export type PostDetailComment = {
+  id: string;
+  user_id: string;
+  username: string | null;
+  display_name: string | null;
+  avatar_url: string | null;
+  is_verified: boolean;
+  content: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type PostDetailReport = {
+  id: string;
+  reporter_id: string;
+  reporter_username: string | null;
+  reporter_display_name: string | null;
+  reporter_avatar_url: string | null;
+  reason: string;
+  details: string | null;
+  created_at: string;
+  status: "pending" | "resolved" | "dismissed";
+  review_notes: string | null;
+  reviewed_at: string | null;
+  reviewer_name: string | null;
+};
+
+export type PostDetail = {
+  post: PostDetailPost;
+  media: PostDetailMedia[];
+  poll: PostDetailPoll | null;
+  likes: PostDetailLike[];
+  comments: PostDetailComment[];
+  reports: PostDetailReport[];
+  activity_limit: number;
+};
+
 export type PostMapStatus = "all" | PostRow["status"];
 export type PostMapRange = 0 | 30 | 90;
 

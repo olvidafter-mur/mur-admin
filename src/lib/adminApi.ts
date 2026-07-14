@@ -6,6 +6,7 @@ import type {
   DashboardData,
   GlobalPostMapData,
   PaginatedResult,
+  PostDetail,
   PostMapRange,
   PostMapStatus,
   PostRow,
@@ -77,6 +78,12 @@ export const listPosts = (params: {
     _status: params.status ?? "all",
     _limit_count: params.limit ?? 25,
     _offset_count: params.offset ?? 0,
+  });
+
+export const getPostDetail = (postId: string, activityLimit = 100) =>
+  rpc<PostDetail>("admin_get_post_detail", {
+    _post_id: postId,
+    _activity_limit: activityLimit,
   });
 
 export const getGlobalPostMap = (

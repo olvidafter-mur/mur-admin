@@ -1,17 +1,19 @@
-import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import {
   Eye,
   EyeOff,
   ExternalLink,
+  FileSearch,
   Heart,
   LoaderCircle,
   MessageCircle,
   Search,
   ShieldAlert,
 } from "lucide-react";
-import { listPosts, setPostModeration } from "../lib/adminApi";
+import { getPostDetail, listPosts, setPostModeration } from "../lib/adminApi";
 import { displayName, formatDate, truncate } from "../lib/format";
-import type { PaginatedResult, PostRow } from "../types";
+import type { PaginatedResult, PostDetail, PostRow } from "../types";
+import PostDetailView from "../components/PostDetailView";
 import {
   Avatar,
   Badge,
@@ -50,6 +52,11 @@ export default function PostsPage({
   const [target, setTarget] = useState<PostRow | null>(null);
   const [reason, setReason] = useState("");
   const [saving, setSaving] = useState(false);
+  const [detailTarget, setDetailTarget] = useState<PostRow | null>(null);
+  const [detail, setDetail] = useState<PostDetail | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailError, setDetailError] = useState<string | null>(null);
+  const detailRequestRef = useRef(0);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -80,6 +87,41 @@ export default function PostsPage({
     setSearch(draftSearch.trim());
   };
 
+  const openDetail = useCallback(async (post: PostRow) => {
+    const requestId = ++detailRequestRef.current;
+    setDetailTarget(post);
+    setDetail(null);
+    setDetailError(null);
+    setDetailLoading(true);
+
+    try {
+      const nextDetail = await getPostDetail(post.id);
+      if (detailRequestRef.current === requestId) setDetail(nextDetail);
+    } catch (detailLoadError) {
+      if (detailRequestRef.current !== requestId) return;
+      setDetailError(
+        detailLoadError instanceof Error
+          ? detailLoadError.message
+          : "No se pudo cargar el detalle de la publicacion.",
+      );
+    } finally {
+      if (detailRequestRef.current === requestId) setDetailLoading(false);
+    }
+  }, []);
+
+  const closeDetail = () => {
+    detailRequestRef.current += 1;
+    setDetailTarget(null);
+    setDetail(null);
+    setDetailError(null);
+    setDetailLoading(false);
+  };
+
+  const openModerationFromDetail = (post: PostRow) => {
+    closeDetail();
+    setTarget(post);
+  };
+
   const closeModal = () => {
     if (saving) return;
     setTarget(null);
@@ -104,6 +146,20 @@ export default function PostsPage({
       setSaving(false);
     }
   };
+
+  if (detailTarget) {
+    return (
+      <PostDetailView
+        summary={detailTarget}
+        detail={detail}
+        loading={detailLoading}
+        error={detailError}
+        onBack={closeDetail}
+        onRetry={() => void openDetail(detailTarget)}
+        onModerate={openModerationFromDetail}
+      />
+    );
+  }
 
   return (
     <div className="page">
@@ -178,6 +234,14 @@ export default function PostsPage({
                       <td className="cell-muted">{formatDate(post.created_at)}</td>
                       <td className="cell-actions post-cell-actions">
                         <div className="post-row-actions">
+                          <button
+                            className="button button-secondary post-open-button"
+                            type="button"
+                            onClick={() => void openDetail(post)}
+                          >
+                            <FileSearch size={15} />
+                            <span>Detalle</span>
+                          </button>
                           <a
                             className="button button-secondary post-open-button"
                             href={postShareUrl(post)}

@@ -80,6 +80,7 @@ export default function App() {
   const [adminLoading, setAdminLoading] = useState(false);
   const [accessDenied, setAccessDenied] = useState(false);
   const [toast, setToast] = useState<{ message: string; tone: "success" | "danger" } | null>(null);
+  const sessionUserId = session?.user.id ?? null;
 
   useLayoutEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -118,7 +119,7 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (!session) {
+    if (!sessionUserId) {
       setAdmin(null);
       setAccessDenied(false);
       setAdminLoading(false);
@@ -146,7 +147,7 @@ export default function App() {
     return () => {
       active = false;
     };
-  }, [session]);
+  }, [sessionUserId]);
 
   useEffect(() => {
     const handleHashChange = () => setView(getViewFromHash());
