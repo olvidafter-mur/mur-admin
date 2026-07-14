@@ -12,6 +12,7 @@ import type {
   PostRow,
   ReportRow,
   UserRow,
+  UserDetail,
 } from "../types";
 
 const rpc = async <T>(
@@ -46,6 +47,12 @@ export const listUsers = (params: {
     _status: params.status ?? "all",
     _limit_count: params.limit ?? 25,
     _offset_count: params.offset ?? 0,
+  });
+
+export const getUserDetail = (userId: string, activityLimit = 50) =>
+  rpc<UserDetail>("admin_get_user_detail", {
+    _user_id: userId,
+    _activity_limit: activityLimit,
   });
 
 export const setUserStatus = (

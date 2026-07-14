@@ -146,6 +146,127 @@ export type UserRow = {
   is_admin: boolean;
 };
 
+export type UserDetailProfile = {
+  id: string;
+  email: string | null;
+  username: string | null;
+  display_name: string | null;
+  avatar_url: string | null;
+  bio: string | null;
+  is_verified: boolean;
+  is_admin: boolean;
+  created_at: string;
+  updated_at: string | null;
+  last_sign_in_at: string | null;
+  email_confirmed_at: string | null;
+  onboarding_completed: boolean;
+  date_of_birth: string | null;
+  terms_version: string | null;
+  terms_accepted_at: string | null;
+  adult_confirmed_at: string | null;
+  responsibility_acknowledged_at: string | null;
+  account_status: "active" | "suspended";
+  suspension_reason: string | null;
+  suspended_at: string | null;
+  suspension_updated_at: string | null;
+  suspension_updated_by: string | null;
+  suspension_updated_by_name: string | null;
+};
+
+export type UserDetailPreferences = {
+  language_preference: "system" | "en" | "es";
+  theme_preference: "system" | "light" | "dark";
+  nearby_radius_meters: number;
+  updated_at: string | null;
+};
+
+export type UserDetailMetrics = {
+  posts_total: number;
+  posts_visible: number;
+  posts_moderated: number;
+  posts_deleted: number;
+  likes_received: number;
+  comments_received: number;
+  likes_given: number;
+  comments_given: number;
+  reports_received: number;
+  reports_made: number;
+  blocked_by: number;
+  blocks_made: number;
+  unread_notifications: number;
+  active_push_devices: number;
+};
+
+export type UserDetailRanking = {
+  total_score: number | string;
+  normalized_score: number | string;
+  activity_score: number | string;
+  author_quality_score: number | string;
+  community_score: number | string;
+  consistency_score: number | string;
+  trust_score: number | string;
+  monetization_score: number | string;
+  moderation_penalty: number | string;
+  boost_multiplier: number | string;
+  components: Record<string, unknown>;
+  calculated_at: string;
+};
+
+export type UserDetailPost = {
+  id: string;
+  share_slug: string | null;
+  content: string;
+  post_type: string | null;
+  created_at: string;
+  deleted_at: string | null;
+  category_name: string | null;
+  status: "visible" | "moderated" | "deleted";
+  moderation_reason: string | null;
+  likes_count: number;
+  comments_count: number;
+  report_count: number;
+  preview_image_url: string | null;
+};
+
+export type UserDetailComment = {
+  id: string;
+  content: string;
+  created_at: string;
+  updated_at: string;
+  post_id: string;
+  post_share_slug: string | null;
+  post_content: string;
+  post_author_name: string | null;
+};
+
+export type UserDetailReport = {
+  id: string;
+  post_id: string;
+  post_share_slug: string | null;
+  post_content: string;
+  reporter_id: string;
+  reporter_name: string | null;
+  reporter_username: string | null;
+  reason: string;
+  details: string | null;
+  created_at: string;
+  status: "pending" | "resolved" | "dismissed";
+  review_notes: string | null;
+  reviewed_at: string | null;
+  reviewer_name: string | null;
+};
+
+export type UserDetail = {
+  profile: UserDetailProfile;
+  preferences: UserDetailPreferences;
+  metrics: UserDetailMetrics;
+  ranking: UserDetailRanking | null;
+  recent_posts: UserDetailPost[];
+  recent_comments: UserDetailComment[];
+  reports_received: UserDetailReport[];
+  activity_limit: number;
+};
+
 export type PostRow = {
   id: string;
   content: string;
