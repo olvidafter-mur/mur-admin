@@ -1,15 +1,17 @@
-import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import {
   Ban,
   CheckCircle2,
+  FileSearch,
   LoaderCircle,
   Search,
   ShieldCheck,
   UserCheck,
 } from "lucide-react";
-import { listUsers, setUserStatus } from "../lib/adminApi";
+import { getUserDetail, listUsers, setUserStatus } from "../lib/adminApi";
 import { displayName, formatDate, formatNumber } from "../lib/format";
-import type { PaginatedResult, UserRow } from "../types";
+import type { PaginatedResult, UserDetail, UserRow } from "../types";
+import UserDetailView from "../components/UserDetailView";
 import {
   Avatar,
   Badge,
@@ -38,6 +40,11 @@ export default function UsersPage({
   const [target, setTarget] = useState<UserRow | null>(null);
   const [reason, setReason] = useState("");
   const [saving, setSaving] = useState(false);
+  const [detailTarget, setDetailTarget] = useState<UserRow | null>(null);
+  const [detail, setDetail] = useState<UserDetail | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailError, setDetailError] = useState<string | null>(null);
+  const detailRequestRef = useRef(0);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -68,6 +75,50 @@ export default function UsersPage({
     setSearch(draftSearch.trim());
   };
 
+  const openDetail = useCallback(async (user: UserRow) => {
+    const requestId = ++detailRequestRef.current;
+    setDetailTarget(user);
+    setDetail(null);
+    setDetailError(null);
+    setDetailLoading(true);
+
+    try {
+      const nextDetail = await getUserDetail(user.id);
+      if (detailRequestRef.current === requestId) setDetail(nextDetail);
+    } catch (detailLoadError) {
+      if (detailRequestRef.current !== requestId) return;
+      setDetailError(
+        detailLoadError instanceof Error
+          ? detailLoadError.message
+          : "No se pudo cargar el detalle del usuario.",
+      );
+    } finally {
+      if (detailRequestRef.current === requestId) setDetailLoading(false);
+    }
+  }, []);
+
+  const closeDetail = () => {
+    detailRequestRef.current += 1;
+    setDetailTarget(null);
+    setDetail(null);
+    setDetailError(null);
+    setDetailLoading(false);
+  };
+
+  const openStatusFromDetail = () => {
+    if (!detailTarget) return;
+    const nextTarget = detail
+      ? {
+          ...detailTarget,
+          account_status: detail.profile.account_status,
+          suspension_reason: detail.profile.suspension_reason,
+          suspended_at: detail.profile.suspended_at,
+        }
+      : detailTarget;
+    closeDetail();
+    setTarget(nextTarget);
+  };
+
   const closeModal = () => {
     if (saving) return;
     setTarget(null);
@@ -94,9 +145,23 @@ export default function UsersPage({
     }
   };
 
+  if (detailTarget) {
+    return (
+      <UserDetailView
+        summary={detailTarget}
+        detail={detail}
+        loading={detailLoading}
+        error={detailError}
+        onBack={closeDetail}
+        onRetry={() => void openDetail(detailTarget)}
+        onStatusChange={openStatusFromDetail}
+      />
+    );
+  }
+
   return (
     <div className="page">
-      <PageHeader title="Usuarios" description="Perfiles, actividad y estado de acceso." />
+      <PageHeader eyebrow="Community" title="Usuarios" description="Perfiles, actividad, reputacion interna y estado de acceso." />
 
       <form className="toolbar" onSubmit={handleSearch}>
         <label className="search-control">
@@ -138,7 +203,7 @@ export default function UsersPage({
             <div className="table-scroll">
               <table>
                 <thead>
-                  <tr><th>Usuario</th><th>Estado</th><th>Actividad</th><th>Ranking</th><th>Reportes</th><th>Alta</th><th><span className="sr-only">Acciones</span></th></tr>
+                  <tr><th>Usuario</th><th>Estado</th><th>Actividad</th><th>Ranking interno</th><th>Reportes</th><th>Alta</th><th><span className="sr-only">Acciones</span></th></tr>
                 </thead>
                 <tbody>
                   {result.items.map((user) => (
@@ -165,17 +230,23 @@ export default function UsersPage({
                       <td><strong>{Number(user.rank_score ?? 0).toFixed(1)}</strong><span className="cell-subline">sobre 100</span></td>
                       <td><Badge tone={user.reports_received_count > 0 ? "warning" : "neutral"}>{user.reports_received_count}</Badge></td>
                       <td className="cell-muted">{formatDate(user.created_at)}</td>
-                      <td className="cell-actions">
-                        <button
-                          className={user.account_status === "active" ? "icon-button icon-button-danger" : "icon-button icon-button-success"}
-                          type="button"
-                          title={user.account_status === "active" ? "Suspender usuario" : "Reactivar usuario"}
-                          aria-label={user.account_status === "active" ? "Suspender usuario" : "Reactivar usuario"}
-                          disabled={user.is_admin}
-                          onClick={() => setTarget(user)}
-                        >
-                          {user.account_status === "active" ? <Ban size={17} /> : <UserCheck size={17} />}
-                        </button>
+                      <td className="cell-actions user-cell-actions">
+                        <div className="post-row-actions">
+                          <button className="button button-secondary post-open-button" type="button" onClick={() => void openDetail(user)}>
+                            <FileSearch size={15} />
+                            <span>Detalle</span>
+                          </button>
+                          <button
+                            className={user.account_status === "active" ? "icon-button icon-button-danger" : "icon-button icon-button-success"}
+                            type="button"
+                            title={user.account_status === "active" ? "Suspender usuario" : "Reactivar usuario"}
+                            aria-label={user.account_status === "active" ? "Suspender usuario" : "Reactivar usuario"}
+                            disabled={user.is_admin}
+                            onClick={() => setTarget(user)}
+                          >
+                            {user.account_status === "active" ? <Ban size={17} /> : <UserCheck size={17} />}
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}

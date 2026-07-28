@@ -1,16 +1,19 @@
-import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import {
   Eye,
   EyeOff,
+  ExternalLink,
+  FileSearch,
   Heart,
   LoaderCircle,
   MessageCircle,
   Search,
   ShieldAlert,
 } from "lucide-react";
-import { listPosts, setPostModeration } from "../lib/adminApi";
+import { getPostDetail, listPosts, setPostModeration } from "../lib/adminApi";
 import { displayName, formatDate, truncate } from "../lib/format";
-import type { PaginatedResult, PostRow } from "../types";
+import type { PaginatedResult, PostDetail, PostRow } from "../types";
+import PostDetailView from "../components/PostDetailView";
 import {
   Avatar,
   Badge,
@@ -23,6 +26,10 @@ import {
 } from "../components/ui";
 
 const PAGE_SIZE = 25;
+const POST_SHARE_BASE_URL = "https://mur.olvidaftech.com/p";
+
+const postShareUrl = (post: PostRow) =>
+  `${POST_SHARE_BASE_URL}/${encodeURIComponent(post.share_slug || post.id)}`;
 
 const statusLabel = {
   visible: "Visible",
@@ -45,6 +52,11 @@ export default function PostsPage({
   const [target, setTarget] = useState<PostRow | null>(null);
   const [reason, setReason] = useState("");
   const [saving, setSaving] = useState(false);
+  const [detailTarget, setDetailTarget] = useState<PostRow | null>(null);
+  const [detail, setDetail] = useState<PostDetail | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailError, setDetailError] = useState<string | null>(null);
+  const detailRequestRef = useRef(0);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -75,6 +87,41 @@ export default function PostsPage({
     setSearch(draftSearch.trim());
   };
 
+  const openDetail = useCallback(async (post: PostRow) => {
+    const requestId = ++detailRequestRef.current;
+    setDetailTarget(post);
+    setDetail(null);
+    setDetailError(null);
+    setDetailLoading(true);
+
+    try {
+      const nextDetail = await getPostDetail(post.id);
+      if (detailRequestRef.current === requestId) setDetail(nextDetail);
+    } catch (detailLoadError) {
+      if (detailRequestRef.current !== requestId) return;
+      setDetailError(
+        detailLoadError instanceof Error
+          ? detailLoadError.message
+          : "No se pudo cargar el detalle de la publicacion.",
+      );
+    } finally {
+      if (detailRequestRef.current === requestId) setDetailLoading(false);
+    }
+  }, []);
+
+  const closeDetail = () => {
+    detailRequestRef.current += 1;
+    setDetailTarget(null);
+    setDetail(null);
+    setDetailError(null);
+    setDetailLoading(false);
+  };
+
+  const openModerationFromDetail = (post: PostRow) => {
+    closeDetail();
+    setTarget(post);
+  };
+
   const closeModal = () => {
     if (saving) return;
     setTarget(null);
@@ -100,9 +147,23 @@ export default function PostsPage({
     }
   };
 
+  if (detailTarget) {
+    return (
+      <PostDetailView
+        summary={detailTarget}
+        detail={detail}
+        loading={detailLoading}
+        error={detailError}
+        onBack={closeDetail}
+        onRetry={() => void openDetail(detailTarget)}
+        onModerate={openModerationFromDetail}
+      />
+    );
+  }
+
   return (
     <div className="page">
-      <PageHeader title="Publicaciones" description="Contenido publicado y acciones de moderacion." />
+      <PageHeader eyebrow="Content" title="Publicaciones" description="Contenido publicado, respuesta de la comunidad y acciones de moderacion." />
 
       <form className="toolbar" onSubmit={handleSearch}>
         <label className="search-control">
@@ -171,18 +232,38 @@ export default function PostsPage({
                         {post.moderation_reason ? <span className="cell-subline" title={post.moderation_reason}>{truncate(post.moderation_reason, 36)}</span> : null}
                       </td>
                       <td className="cell-muted">{formatDate(post.created_at)}</td>
-                      <td className="cell-actions">
-                        {post.status !== "deleted" ? (
+                      <td className="cell-actions post-cell-actions">
+                        <div className="post-row-actions">
                           <button
-                            className={post.status === "visible" ? "icon-button icon-button-danger" : "icon-button icon-button-success"}
+                            className="button button-secondary post-open-button"
                             type="button"
-                            title={post.status === "visible" ? "Ocultar publicacion" : "Restaurar publicacion"}
-                            aria-label={post.status === "visible" ? "Ocultar publicacion" : "Restaurar publicacion"}
-                            onClick={() => setTarget(post)}
+                            onClick={() => void openDetail(post)}
                           >
-                            {post.status === "visible" ? <EyeOff size={17} /> : <Eye size={17} />}
+                            <FileSearch size={15} />
+                            <span>Detalle</span>
                           </button>
-                        ) : null}
+                          <a
+                            className="button button-secondary post-open-button"
+                            href={postShareUrl(post)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            aria-label={`Abrir post ${post.id.slice(0, 8)}`}
+                          >
+                            <ExternalLink size={15} />
+                            <span>Abrir post</span>
+                          </a>
+                          {post.status !== "deleted" ? (
+                            <button
+                              className={post.status === "visible" ? "icon-button icon-button-danger" : "icon-button icon-button-success"}
+                              type="button"
+                              title={post.status === "visible" ? "Ocultar publicacion" : "Restaurar publicacion"}
+                              aria-label={post.status === "visible" ? "Ocultar publicacion" : "Restaurar publicacion"}
+                              onClick={() => setTarget(post)}
+                            >
+                              {post.status === "visible" ? <EyeOff size={17} /> : <Eye size={17} />}
+                            </button>
+                          ) : null}
+                        </div>
                       </td>
                     </tr>
                   ))}

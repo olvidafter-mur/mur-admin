@@ -1,11 +1,21 @@
 import { requireSupabase } from "./supabase";
 import type {
+  AdminActivityHistory,
+  AdminAnalyticsData,
+  AdminCreatedPost,
   AdminUser,
+  AnalyticsRange,
   DashboardData,
+  GlobalPostMapData,
   PaginatedResult,
+  PostDetail,
+  PostComposerOptions,
+  PostMapRange,
+  PostMapStatus,
   PostRow,
   ReportRow,
   UserRow,
+  UserDetail,
 } from "../types";
 
 const rpc = async <T>(
@@ -23,8 +33,47 @@ const rpc = async <T>(
 
 export const getAdminMe = () => rpc<AdminUser>("admin_get_me");
 
+export const getPostComposerOptions = () =>
+  rpc<PostComposerOptions>("admin_get_post_composer_options");
+
+export const createAdminPost = (input: {
+  content: string;
+  categoryId: string;
+  latitude: number;
+  longitude: number;
+  shareLocation: boolean;
+}) =>
+  rpc<AdminCreatedPost>("admin_create_post", {
+    _content: input.content,
+    _category_id: input.categoryId,
+    _latitude: input.latitude,
+    _longitude: input.longitude,
+    _share_location: input.shareLocation,
+  });
+
 export const getDashboard = () =>
   rpc<DashboardData>("admin_get_dashboard");
+
+export const getAnalytics = async (
+  days: AnalyticsRange,
+): Promise<AdminAnalyticsData> => {
+  const [analytics, history] = await Promise.all([
+    rpc<AdminAnalyticsData>("admin_get_analytics", { _days: days }),
+    rpc<AdminActivityHistory>("admin_get_activity_history", { _days: days }),
+  ]);
+
+  return {
+    ...analytics,
+    generated_at: history.generated_at,
+    window_days: history.window_days,
+    overview: {
+      ...analytics.overview,
+      ...history.overview,
+    },
+    timeseries: history.timeseries,
+    categories: history.categories,
+  };
+};
 
 export const listUsers = (params: {
   search?: string;
@@ -37,6 +86,12 @@ export const listUsers = (params: {
     _status: params.status ?? "all",
     _limit_count: params.limit ?? 25,
     _offset_count: params.offset ?? 0,
+  });
+
+export const getUserDetail = (userId: string, activityLimit = 50) =>
+  rpc<UserDetail>("admin_get_user_detail", {
+    _user_id: userId,
+    _activity_limit: activityLimit,
   });
 
 export const setUserStatus = (
@@ -69,6 +124,21 @@ export const listPosts = (params: {
     _status: params.status ?? "all",
     _limit_count: params.limit ?? 25,
     _offset_count: params.offset ?? 0,
+  });
+
+export const getPostDetail = (postId: string, activityLimit = 100) =>
+  rpc<PostDetail>("admin_get_post_detail", {
+    _post_id: postId,
+    _activity_limit: activityLimit,
+  });
+
+export const getGlobalPostMap = (
+  status: PostMapStatus,
+  days: PostMapRange,
+) =>
+  rpc<GlobalPostMapData>("admin_get_global_post_map", {
+    _status: status,
+    _days: days,
   });
 
 export const setPostModeration = (

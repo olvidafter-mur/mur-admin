@@ -1,30 +1,51 @@
-import { useCallback, useEffect, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useState } from "react";
 import type { Session } from "@supabase/supabase-js";
-import { AlertTriangle, CheckCircle2, LockKeyhole, Settings2 } from "lucide-react";
+import { AlertTriangle, CheckCircle2, LoaderCircle, LockKeyhole, Settings2 } from "lucide-react";
 import AppShell from "./components/AppShell";
+import { BrandMark } from "./components/ui";
 import { getAdminMe } from "./lib/adminApi";
 import { isSupabaseConfigured, requireSupabase, supabase } from "./lib/supabase";
-import DashboardPage from "./pages/DashboardPage";
 import LoginPage from "./pages/LoginPage";
-import PostsPage from "./pages/PostsPage";
-import ReportsPage from "./pages/ReportsPage";
-import UsersPage from "./pages/UsersPage";
-import type { AdminUser, AdminView } from "./types";
+import type { AdminUser, AdminView, Theme } from "./types";
 
-const validViews: AdminView[] = ["dashboard", "reports", "posts", "users"];
+const DashboardPage = lazy(() => import("./pages/DashboardPage"));
+const MapPage = lazy(() => import("./pages/MapPage"));
+const PublishPage = lazy(() => import("./pages/PublishPage"));
+const PostsPage = lazy(() => import("./pages/PostsPage"));
+const ReportsPage = lazy(() => import("./pages/ReportsPage"));
+const UsersPage = lazy(() => import("./pages/UsersPage"));
+
+const validViews: AdminView[] = ["dashboard", "map", "publish", "reports", "posts", "users"];
 
 const getViewFromHash = (): AdminView => {
   const hash = window.location.hash.replace("#", "") as AdminView;
   return validViews.includes(hash) ? hash : "dashboard";
 };
 
+const getInitialTheme = (): Theme => {
+  try {
+    return window.localStorage.getItem("mur-admin-theme") === "dark" ? "dark" : "light";
+  } catch {
+    return "light";
+  }
+};
+
 function FullPageLoader() {
   return (
     <main className="full-page-state" role="status">
-      <span className="brand-mark brand-mark-large">m</span>
+      <BrandMark large />
       <span className="loader-bar" />
       <p>Validando acceso</p>
     </main>
+  );
+}
+
+function ViewLoader() {
+  return (
+    <div className="state-panel view-loader" role="status">
+      <LoaderCircle className="spin" size={20} />
+      <span>Preparando vista</span>
+    </div>
   );
 }
 
@@ -52,13 +73,28 @@ function AccessDenied({ onSignOut }: { onSignOut: () => void }) {
 }
 
 export default function App() {
+  const [theme, setTheme] = useState<Theme>(getInitialTheme);
   const [session, setSession] = useState<Session | null>(null);
   const [admin, setAdmin] = useState<AdminUser | null>(null);
   const [view, setView] = useState<AdminView>(getViewFromHash);
   const [authLoading, setAuthLoading] = useState(true);
   const [adminLoading, setAdminLoading] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
   const [accessDenied, setAccessDenied] = useState(false);
   const [toast, setToast] = useState<{ message: string; tone: "success" | "danger" } | null>(null);
+  const sessionUserId = session?.user.id ?? null;
+
+  useLayoutEffect(() => {
+    document.documentElement.dataset.theme = theme;
+    document.documentElement.style.colorScheme = theme;
+    document.querySelector<HTMLMetaElement>('meta[name="theme-color"]')
+      ?.setAttribute("content", theme === "light" ? "#f7f8f9" : "#1d2125");
+    try {
+      window.localStorage.setItem("mur-admin-theme", theme);
+    } catch {
+      // The selected theme still applies for the current session.
+    }
+  }, [theme]);
 
   useEffect(() => {
     if (!supabase) {
@@ -85,7 +121,7 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (!session) {
+    if (!sessionUserId) {
       setAdmin(null);
       setAccessDenied(false);
       setAdminLoading(false);
@@ -113,7 +149,7 @@ export default function App() {
     return () => {
       active = false;
     };
-  }, [session]);
+  }, [sessionUserId]);
 
   useEffect(() => {
     const handleHashChange = () => setView(getViewFromHash());
@@ -128,31 +164,94 @@ export default function App() {
   }, [toast]);
 
   const navigate = (nextView: AdminView) => {
-    window.location.hash = nextView;
-    setView(nextView);
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    const updateView = () => {
+      window.location.hash = nextView;
+      setView(nextView);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    };
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const transitionDocument = document as Document & {
+      startViewTransition?: (callback: () => void) => unknown;
+    };
+
+    if (!reducedMotion && transitionDocument.startViewTransition) {
+      transitionDocument.startViewTransition(updateView);
+    } else {
+      updateView();
+    }
   };
 
-  const signOut = useCallback(() => {
-    void requireSupabase().auth.signOut();
-  }, []);
+  const signOut = useCallback(async () => {
+    if (signingOut) return;
+
+    setSigningOut(true);
+    try {
+      const { error: signOutError } = await requireSupabase().auth.signOut({
+        scope: "local",
+      });
+      const sessionAlreadyMissing = signOutError?.message
+        .toLowerCase()
+        .includes("auth session missing");
+      if (signOutError && !sessionAlreadyMissing) throw signOutError;
+
+      setSession(null);
+      setAdmin(null);
+      setAccessDenied(false);
+      setAdminLoading(false);
+      setAuthLoading(false);
+      window.location.hash = "";
+    } catch (signOutError) {
+      setToast({
+        message: signOutError instanceof Error
+          ? signOutError.message
+          : "No se pudo cerrar la sesion.",
+        tone: "danger",
+      });
+    } finally {
+      setSigningOut(false);
+    }
+  }, [signingOut]);
 
   const notify = useCallback((message: string, tone: "success" | "danger" = "success") => {
     setToast({ message, tone });
   }, []);
 
+  const toggleTheme = useCallback(() => {
+    setTheme((current) => current === "light" ? "dark" : "light");
+  }, []);
+
   if (!isSupabaseConfigured) return <ConfigurationRequired />;
   if (authLoading || adminLoading) return <FullPageLoader />;
-  if (!session) return <LoginPage />;
-  if (accessDenied || !admin) return <AccessDenied onSignOut={signOut} />;
+  if (!session) return <LoginPage theme={theme} onToggleTheme={toggleTheme} />;
+  if (accessDenied || !admin) return <AccessDenied onSignOut={() => void signOut()} />;
 
   return (
     <>
-      <AppShell admin={admin} view={view} onNavigate={navigate} onSignOut={signOut}>
-        {view === "dashboard" ? <DashboardPage onNavigate={navigate} /> : null}
-        {view === "reports" ? <ReportsPage notify={notify} /> : null}
-        {view === "posts" ? <PostsPage notify={notify} /> : null}
-        {view === "users" ? <UsersPage notify={notify} /> : null}
+      <a className="skip-link" href="#main-content">Ir al contenido principal</a>
+      <AppShell
+        admin={admin}
+        view={view}
+        theme={theme}
+        onNavigate={navigate}
+        signingOut={signingOut}
+        onSignOut={() => void signOut()}
+        onToggleTheme={toggleTheme}
+      >
+        <Suspense fallback={<ViewLoader />}>
+          {view === "dashboard" ? <DashboardPage theme={theme} onNavigate={navigate} /> : null}
+          {view === "map" ? <MapPage theme={theme} onNavigate={navigate} /> : null}
+          {view === "publish" ? (
+            <PublishPage
+              admin={admin}
+              theme={theme}
+              notify={notify}
+              onNavigate={navigate}
+            />
+          ) : null}
+          {view === "reports" ? <ReportsPage notify={notify} /> : null}
+          {view === "posts" ? <PostsPage notify={notify} /> : null}
+          {view === "users" ? <UsersPage notify={notify} /> : null}
+        </Suspense>
       </AppShell>
 
       {toast ? (

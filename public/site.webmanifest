@@ -1,0 +1,29 @@
+{
+  "name": "Mur Operations",
+  "short_name": "Mur Admin",
+  "description": "Panel privado de operaciones y moderación de Mur",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f7f8f9",
+  "theme_color": "#f7f8f9",
+  "icons": [
+    {
+      "src": "/favicon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/mur-icon.png",
+      "sizes": "1024x1024",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/mur-icon-maskable.png",
+      "sizes": "1024x1024",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

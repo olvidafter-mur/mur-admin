@@ -10,12 +10,21 @@ CSS estandar y Supabase Auth.
 - Busqueda y moderacion de publicaciones.
 - Busqueda, suspension y reactivacion de usuarios.
 - Auditoria de todas las acciones administrativas.
+- Centro de inteligencia con series temporales, segmentos y categorias.
+- Deteccion explicable de concentracion de reportes, bloqueos y actividad inusual.
+- Red agregada de interacciones entre participantes y autores.
+- Tema claro por defecto con modo oscuro persistente por dispositivo.
 
 ## Configuracion local
 
-1. Aplicar la migracion
-   `mur-app/supabase/migrations/20260713120000_create_admin_console.sql` con el
-   flujo habitual de Supabase del proyecto.
+1. Aplicar las migraciones administrativas de `mur-app` con el flujo habitual
+   del proyecto. Incluyen la consola base y la capa analitica protegida:
+
+   ```powershell
+   cd ..\mur-app
+   supabase db push
+   cd ..\mur-admin
+   ```
 2. Dar acceso inicial a las cuentas administradoras desde Supabase SQL Editor:
 
    ```sql
@@ -48,6 +57,12 @@ CSS estandar y Supabase Auth.
 
 El servidor local queda configurado en `http://127.0.0.1:5174`.
 
+## Identidad visual
+
+El logo web proviene de `mur-landing/public/logo.png`. Los iconos, favicon y
+variante maskable provienen de `mur-app/assets/images` para mantener la misma
+identidad en el navegador, accesos directos y dispositivos.
+
 ## Seguridad
 
 El navegador usa exclusivamente la clave publica de Supabase. Los datos internos
@@ -55,3 +70,7 @@ y las mutaciones se exponen mediante RPC con validacion de administrador en la
 base de datos. La Edge Function usa la credencial de servidor que Supabase le
 inyecta automaticamente; no se necesita ni debe agregarse una clave
 `service_role` al panel.
+
+Las senales analiticas son heuristicas transparentes y no ejecutan sanciones.
+La red de comportamiento agrega interacciones existentes, limita nodos y aristas,
+y no expone ubicaciones de usuarios.
