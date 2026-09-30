@@ -165,11 +165,6 @@ export default function PostDetailView({
       </button>
 
       <header className="post-detail-page-header">
-        <div>
-          <span className="page-eyebrow">Publicaciones / Detalle</span>
-          <h1>Detalle de la publicacion</h1>
-          <p>{summary.id} · {formatDate(summary.created_at)}</p>
-        </div>
         <div className="post-detail-page-actions">
           {post && post.status !== "deleted" ? (
             <button className="button button-secondary" type="button" onClick={() => onModerate(post)}>

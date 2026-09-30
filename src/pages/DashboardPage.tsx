@@ -46,7 +46,7 @@ const dateLabel = new Intl.DateTimeFormat("es-AR", {
 });
 
 const getChartColors = (theme: Theme) => theme === "dark" ? {
-  lime: "#579dff",
+  lime: "#80d7b0",
   cyan: "#60c6d2",
   violet: "#b8acf6",
   coral: "#fd9891",
@@ -57,9 +57,9 @@ const getChartColors = (theme: Theme) => theme === "dark" ? {
   grid: "rgba(182,194,207,0.16)",
   tooltipBackground: "#282e33",
   tooltipBorder: "#505a62",
-  area: "rgba(87,157,255,0.14)",
+  area: "rgba(128,215,176,0.14)",
 } : {
-  lime: "#0c66e4",
+  lime: "#187653",
   cyan: "#0e7c86",
   violet: "#6e5dc6",
   coral: "#ae2e24",
@@ -70,7 +70,7 @@ const getChartColors = (theme: Theme) => theme === "dark" ? {
   grid: "rgba(9,30,66,0.12)",
   tooltipBackground: "#ffffff",
   tooltipBorder: "#dcdfe4",
-  area: "rgba(12,102,228,0.12)",
+  area: "rgba(24,118,83,0.12)",
 };
 
 const getTooltip = (colors: ReturnType<typeof getChartColors>) => ({

@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import {
   Activity,
   ChevronRight,
@@ -6,6 +6,8 @@ import {
   Globe2,
   LoaderCircle,
   LogOut,
+  PanelLeftClose,
+  PanelLeftOpen,
   Send,
   ShieldAlert,
   ShieldCheck,
@@ -21,7 +23,7 @@ const navItems: Array<{
   description: string;
   icon: typeof Activity;
 }> = [
-  { id: "dashboard", label: "Inteligencia", description: "Pulso y patrones", icon: Activity },
+  { id: "dashboard", label: "Resumen", description: "Pulso y patrones", icon: Activity },
   { id: "map", label: "Mapa global", description: "Actividad geolocalizada", icon: Globe2 },
   { id: "publish", label: "Publicar", description: "Crear contenido", icon: Send },
   { id: "reports", label: "Reportes", description: "Cola de decisiones", icon: ShieldAlert },
@@ -48,39 +50,77 @@ export default function AppShell({
   signingOut: boolean;
   onToggleTheme: () => void;
 }) {
+  const [collapsed, setCollapsed] = useState(() => {
+    try {
+      return window.localStorage.getItem("mur-admin-sidebar-collapsed") === "true";
+    } catch {
+      return false;
+    }
+  });
+  const toggleSidebar = () => {
+    const nextCollapsed = !collapsed;
+    setCollapsed(nextCollapsed);
+    try {
+      window.localStorage.setItem("mur-admin-sidebar-collapsed", String(nextCollapsed));
+    } catch {
+      // Keep the preference for this session when storage is unavailable.
+    }
+  };
   const activeItem = navItems.find((item) => item.id === view) ?? navItems[0];
 
   return (
-    <div className="app-shell">
-      <aside className="sidebar">
+    <div className={collapsed ? "app-shell sidebar-collapsed" : "app-shell"}>
+      <aside className="sidebar" id="admin-sidebar">
+        <div className="sidebar-heading">
         <div className="brand-lockup">
           <BrandMark />
           <div>
             <strong>mur.</strong>
-            <span>Operations</span>
+            <span>Administración</span>
           </div>
+        </div>
+        <button
+          className="icon-button sidebar-toggle"
+          type="button"
+          onClick={toggleSidebar}
+          aria-expanded={!collapsed}
+          aria-controls="admin-sidebar"
+          aria-label={collapsed ? "Expandir menú lateral" : "Contraer menú lateral"}
+          title={collapsed ? "Expandir menú lateral" : "Contraer menú lateral"}
+        >
+          {collapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
+        </button>
         </div>
 
         <div className="workspace-chip">
           <span className="status-orb" />
-          <div><strong>Produccion</strong><span>Supabase conectado</span></div>
+          <div><strong>Espacio de trabajo</strong><span>Equipo de Mur</span></div>
           <ShieldCheck size={15} />
         </div>
 
-        <nav className="sidebar-nav" aria-label="Navegacion principal">
-          <span className="nav-section-label">Workspace</span>
-          {navItems.map(({ id, label, description, icon: Icon }) => (
-            <button
-              key={id}
-              className={view === id ? "nav-item is-active" : "nav-item"}
-              type="button"
-              aria-current={view === id ? "page" : undefined}
-              onClick={() => onNavigate(id)}
-            >
-              <span className="nav-icon"><Icon size={18} /></span>
-              <span><strong>{label}</strong><small>{description}</small></span>
-              <ChevronRight className="nav-arrow" size={15} />
-            </button>
+        <nav className="sidebar-nav" aria-label="Navegación principal">
+          {[
+            { label: "Explorar", items: navItems.slice(0, 2) },
+            { label: "Gestionar", items: navItems.slice(2) },
+          ].map((group) => (
+            <div className="nav-group" key={group.label}>
+              <span className="nav-section-label">{group.label}</span>
+              {group.items.map(({ id, label, description, icon: Icon }) => (
+                <button
+                  key={id}
+                  className={view === id ? "nav-item is-active" : "nav-item"}
+                  type="button"
+                  aria-label={label}
+                  title={collapsed ? label : undefined}
+                  aria-current={view === id ? "page" : undefined}
+                  onClick={() => onNavigate(id)}
+                >
+                  <span className="nav-icon"><Icon size={18} /></span>
+                  <span><strong>{label}</strong><small>{description}</small></span>
+                  <ChevronRight className="nav-arrow" size={15} />
+                </button>
+              ))}
+            </div>
           ))}
         </nav>
 
@@ -106,14 +146,12 @@ export default function AppShell({
       <div className="workspace-shell">
         <header className="workspace-bar">
           <div className="workspace-breadcrumb">
-            <span>Mur operations</span>
+            <span>Administración</span>
             <ChevronRight size={14} />
             <strong>{activeItem.label}</strong>
           </div>
           <div className="workspace-status">
-            <span className="live-indicator"><i /> Online</span>
-            <span className="workspace-divider" />
-            <span>Acceso administrador</span>
+            <span className="live-indicator"><ShieldCheck size={14} /> Acceso autorizado</span>
             <ThemeToggle theme={theme} onToggle={onToggleTheme} />
           </div>
         </header>
@@ -141,7 +179,7 @@ export default function AppShell({
         </div>
       </div>
 
-      <nav className="mobile-nav" aria-label="Navegacion principal">
+      <nav className="mobile-nav" aria-label="Navegación principal">
         {navItems.map(({ id, label, icon: Icon }) => (
           <button
             key={id}

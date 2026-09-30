@@ -66,25 +66,13 @@ export const ThemeToggle = ({
 };
 
 export const PageHeader = ({
-  eyebrow,
-  title,
-  description,
   action,
 }: {
   eyebrow?: string;
   title: string;
   description: string;
   action?: ReactNode;
-}) => (
-  <header className="page-header">
-    <div>
-      {eyebrow ? <span className="page-eyebrow">{eyebrow}</span> : null}
-      <h1>{title}</h1>
-      <p>{description}</p>
-    </div>
-    {action ? <div className="page-header-action">{action}</div> : null}
-  </header>
-);
+}) => action ? <div className="view-actions">{action}</div> : null;
 
 export const LoadingState = ({ label = "Cargando datos" }: { label?: string }) => (
   <div className="state-panel" role="status">

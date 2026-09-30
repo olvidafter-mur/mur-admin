@@ -213,7 +213,6 @@ export default function UserDetailView({
   }, [detail]);
 
   const profile = detail?.profile;
-  const title = profile ? displayName(profile) : displayName(summary);
   const accountStatus = profile?.account_status || summary.account_status;
   const isAdmin = profile?.is_admin ?? summary.is_admin;
   const rankingScore = asNumber(detail?.ranking?.normalized_score ?? summary.rank_score);
@@ -234,11 +233,6 @@ export default function UserDetailView({
       </button>
 
       <header className="user-detail-page-header">
-        <div>
-          <span className="page-eyebrow">Usuarios / Detalle</span>
-          <h1>{title}</h1>
-          <p>{summary.id}</p>
-        </div>
         {!isAdmin ? (
           <button
             className={accountStatus === "active" ? "button button-danger" : "button button-success"}

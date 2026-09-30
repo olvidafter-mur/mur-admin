@@ -88,7 +88,7 @@ export default function App() {
     document.documentElement.dataset.theme = theme;
     document.documentElement.style.colorScheme = theme;
     document.querySelector<HTMLMetaElement>('meta[name="theme-color"]')
-      ?.setAttribute("content", theme === "light" ? "#f7f8f9" : "#1d2125");
+      ?.setAttribute("content", theme === "light" ? "#f5f7f6" : "#1d2125");
     try {
       window.localStorage.setItem("mur-admin-theme", theme);
     } catch {
@@ -152,7 +152,9 @@ export default function App() {
   }, [sessionUserId]);
 
   useEffect(() => {
-    const handleHashChange = () => setView(getViewFromHash());
+    const handleHashChange = () => {
+      if (window.location.hash !== "#main-content") setView(getViewFromHash());
+    };
     window.addEventListener("hashchange", handleHashChange);
     return () => window.removeEventListener("hashchange", handleHashChange);
   }, []);

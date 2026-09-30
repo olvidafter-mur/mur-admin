@@ -352,7 +352,7 @@ export default function MapPage({
           border: "#596773",
           ink: "#f7f8f9",
           muted: "#b6c2cf",
-          visible: "#579dff",
+          visible: "#80d7b0",
           moderated: "#fd9891",
           deleted: "#8c9bab",
           selectedLand: "#1c416d",
@@ -364,11 +364,11 @@ export default function MapPage({
           border: "#b3b9c4",
           ink: "#172b4d",
           muted: "#626f86",
-          visible: "#0c66e4",
+          visible: "#187653",
           moderated: "#ae2e24",
           deleted: "#7e8da7",
           selectedLand: "#dbeafe",
-          selectedBorder: "#0c66e4",
+          selectedBorder: "#187653",
         };
 
     const series = (["visible", "moderated", "deleted"] as const).map((itemStatus) => {
